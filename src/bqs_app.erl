@@ -12,26 +12,31 @@
 start(_StartType, _StartArgs) ->
 
     lager:set_loglevel(lager_console_backend, debug),
-    
+
     %% {Host, list({Path, Handler, Opts})}
     %% Dispatch the requests (whatever the host is) to
     %% erws_handler, without any additional options.
-    ListeningPort = 
-	case application:get_env(listening_port) of
-	    undefined ->
-		8000;
-	    {ok, Port} ->
-		Port
-	end,
+    ListeningPort =
+        case application:get_env(listening_port) of
+            undefined ->
+                8000;
+            {ok, Port} ->
+                Port
+        end,
+
+    Handlers = case application:get_env(client_dir) of
+                   undefined ->
+                       [{"/", bqs_handler, []}];
+                   Dir ->
+                       [{"/bq/[...]", cowboy_static, {dir, Dir}},
+                        {"/shared/[...]", cowboy_static, {dir, Dir}},
+                        {"/", bqs_handler, []}]
+               end,
 
     lager:debug("Starting bqs on port ~p", [ListeningPort]),
-	Dispatch = cowboy_router:compile([
-		{'_', [
-			{"/", bqs_handler, []}
-			]}
-	]),
-	{ok, _} = cowboy:start_http(http, 100, [{port, ListeningPort}],
-		[{env, [{dispatch, Dispatch}]}]),
+    Dispatch = cowboy_router:compile([{'_', Handlers}]),
+    {ok, _} = cowboy:start_http(http, 100, [{port, ListeningPort}],
+                                [{env, [{dispatch, Dispatch}]}]),
 
     bqs_sup:start_link().
 
