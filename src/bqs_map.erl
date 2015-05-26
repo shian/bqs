@@ -53,31 +53,7 @@ pos_to_tileid(X, Y) ->
 %%% gen_server callbacks
 %%%===================================================================
 init([MapName]) ->
-    File = code:priv_dir(bqs) ++ "/maps/" ++ MapName,
-    {ok, FileBin} = file:read_file(File),
-    {Json} = jiffy:decode(FileBin),
-    Height = proplists:get_value(<<"height">>, Json),
-    Width = proplists:get_value(<<"width">>, Json),
-    Collisions = proplists:get_value(<<"collisions">>, Json),
-    Checkpoints = [get_checkpoint(Point) ||
-            Point <- proplists:get_value(<<"checkpoints">>, Json)],
-    StartingAreas = [Cp || Cp <- Checkpoints, Cp#cp.s == true],
-    RoamingAreas = [get_mobarea(Area) ||
-            Area <- proplists:get_value(<<"roamingAreas">>, Json)],
-    {Entities} = proplists:get_value(<<"staticEntities">>, Json),
-    StaticEntities = get_staticEntity(Entities, Width),
-
-    %spawn the enemies
-    start_mob(RoamingAreas),
-    start_mob(StaticEntities),
-
-    Map = #map{checkpoints = Checkpoints,
-               startingAreas = StartingAreas,
-               height= Height,
-               width = Width,
-               json = Json,
-               collisions = Collisions
-              },
+    {ok, Map} = read_map(MapName),
     {ok, Map}.
 
 handle_call(get_startingAreas, _From, Map) ->
@@ -101,6 +77,14 @@ handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
     {noreply, State}.
 
+handle_info({read_map, MapName}, State) ->
+    lager:debug("read map ~p", [MapName]),
+    {ok, NewMap} = try read_map(MapName)
+                   catch Err:Why ->
+                           lager:error("read map: ~p", [{Err, Why, erlang:get_stacktrace()}]),
+                           {ok, State}
+                   end,
+    {noreply, NewMap};
 handle_info(Info, State) ->
     bqs_util:unexpected_info(?MODULE, Info, State),
     {noreply, State}.
@@ -156,11 +140,11 @@ tileid_to_pos(0, _) ->
     exit("Invalid TileId");
 tileid_to_pos(TileId, Width) ->
     X = case TileId rem Width of
-        0 ->
-            Width - 1;
-        Rem ->
-            Rem -1
-    end,
+            0 ->
+                Width - 1;
+            Rem ->
+                Rem -1
+        end,
     Y = (TileId - 1) div Width,
     {X, Y}.
 
@@ -180,3 +164,32 @@ add_mob(#mobarea{type = Type, x = X, y = Y, w = W, h = H}) ->
     StartX = X - 1 + random:uniform(W),
     StartY = Y - 1 + random:uniform(H),
     bqs_mob_sup:add_child(Type, StartX, StartY).
+
+read_map(MapName) ->
+    File = filename:join([code:priv_dir(bqs), "maps", MapName]),
+    lager:debug("read map ~p", [File]),
+    {ok, FileBin} = file:read_file(File),
+    {Json} = jiffy:decode(FileBin),
+    Height = proplists:get_value(<<"height">>, Json),
+    Width = proplists:get_value(<<"width">>, Json),
+    Collisions = proplists:get_value(<<"collisions">>, Json),
+    Checkpoints = [get_checkpoint(Point) ||
+                      Point <- proplists:get_value(<<"checkpoints">>, Json)],
+    StartingAreas = [Cp || Cp <- Checkpoints, Cp#cp.s == true],
+    RoamingAreas = [get_mobarea(Area) ||
+                       Area <- proplists:get_value(<<"roamingAreas">>, Json)],
+    {Entities} = proplists:get_value(<<"staticEntities">>, Json),
+    StaticEntities = get_staticEntity(Entities, Width),
+
+                                                %spawn the enemies
+    start_mob(RoamingAreas),
+    start_mob(StaticEntities),
+
+    Map = #map{checkpoints = Checkpoints,
+               startingAreas = StartingAreas,
+               height= Height,
+               width = Width,
+               json = Json,
+               collisions = Collisions
+              },
+    {ok, Map}.
