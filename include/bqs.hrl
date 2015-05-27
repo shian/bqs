@@ -38,34 +38,36 @@
 -define(PLAYER_BUCKET, <<"player">>).
 
 
-% WS messages
--define(HELLO, 0).
--define(WELCOME, 1).
--define(SPAWN, 2).
--define(DESPAWN, 3).
--define(MOVE, 4).
--define(LOOTMOVE, 5).
--define(AGGRO, 6).
--define(ATTACK, 7).
--define(HIT, 8).
--define(HURT, 9).
--define(HEALTH, 10).
--define(CHAT, 11).
--define(LOOT, 12).
--define(EQUIP, 13).
--define(DROP, 14).
--define(TELEPORT, 15).
--define(DAMAGE, 16).
--define(POPULATION, 17).
--define(KILL, 18).
--define(LIST, 19).
--define(WHO, 20).
--define(ZONE, 21).
--define(DESTROY, 22).
--define(HP, 23).
--define(BLINK, 24).
--define(OPEN, 25).
--define(CHECK, 26).
+%%  WS messages
+%% Server have to send "go" at client connected, then client send HELLO to Server
+%%                      % C  -> S              % C <-  S                       %
+-define(HELLO, 0).      % name type weapon     %                               %
+-define(WELCOME, 1).    %                      % id name x y hp                %
+-define(SPAWN, 2).      %                      % id kind x y                   %
+-define(DESPAWN, 3).    %                      % id                            %
+-define(MOVE, 4).       % x y                  % id x y                        %
+-define(LOOTMOVE, 5).   % x y item             % id item                       %
+-define(AGGRO, 6).      % mob                  %                               %
+-define(ATTACK, 7).     % mob                  % attacker target               %
+-define(HIT, 8).        % mob                  %                               %
+-define(HURT, 9).       % mob                  %                               %
+-define(HEALTH, 10).    %                      % point isRegen                 %
+-define(CHAT, 11).      % text                 % id text                       %
+-define(LOOT, 12).      % item                 %                               %
+-define(EQUIP, 13).     %                      % id itemkind                   %
+-define(DROP, 14).      %                      % mob id kind playersInvolved   %
+-define(TELEPORT, 15).  % x y                  % id x y                        %
+-define(DAMAGE, 16).    %                      % id dmg                        %
+-define(POPULATION, 17).%                      % worldPlayers totalPlayers     %
+-define(KILL, 18).      %                      % mobKind                       %
+-define(LIST, 19).      %                      % data                          %
+-define(WHO, 20).       % player               %                               %
+-define(ZONE, 21).      % *                    %                               %
+-define(DESTROY, 22).   %                      % id                            %
+-define(HP, 23).        %                      % maxHp                         %
+-define(BLINK, 24).     %                      % id                            %
+-define(OPEN, 25).      % chest                %                               %
+-define(CHECK, 26).     %                      % *                             %
 
 % Game items
 -define(WARRIOR, 1).
