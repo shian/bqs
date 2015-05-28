@@ -4,3 +4,5 @@ log/
 erl_crash.dump
 .eunit/
 tags
+.idea/
+bqs.iml
