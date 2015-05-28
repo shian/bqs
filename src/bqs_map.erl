@@ -136,6 +136,25 @@ insert_staticEntity([{TileId, <<"rat">> = Type} | Entities], Width, Tab) ->
 insert_staticEntity([_ | Entities], Width, Tab) ->
     insert_staticEntity(Entities, Width, Tab).
 
+insert_door({[{<<"x">>, X}, {<<"y">>, Y}, {<<"p">>, P}, {<<"to">>, To}, {<<"tx">>, Tx}, {<<"ty">>, Ty}]}, Tab) ->
+    Door = #door{x=X,y=Y,p=P,to=To,tx=Tx,ty=Ty},
+    ets:insert(Tab, {{door, {X, Y}}, Door}),
+    ok;
+insert_door({[{<<"x">>, X}, {<<"y">>, Y}, {<<"p">>, P}, {<<"tcx">>, Tcx}, {<<"tcy">>, Tcy}, {<<"to">>, To}, {<<"tx">>, Tx}, {<<"ty">>, Ty}]}, Tab) ->
+    Door = #door{x=X,y=Y,p=P,tcx=Tcx, tcy=Tcy, to=To,tx=Tx,ty=Ty},
+    ets:insert(Tab, {{door, {X, Y}}, Door}),
+    ok.
+
+insert_chestarea({[{<<"x">>, X}, {<<"y">>, Y}, {<<"w">>, W}, {<<"h">>, H}, {<<"i">>, I}, {<<"tx">>, Tx}, {<<"ty">>, Ty}]}, Tab) ->
+    ChestArea = #chestarea{x=X,y=Y,w=W,h=H,i=I,tx=Tx,ty=Ty},
+    ets:insert(Tab, {{chestarea, {X, Y}}, ChestArea}),
+    ok.
+
+insert_chest({[{<<"x">>, X}, {<<"y">>, Y}, {<<"i">>, I}]}, Tab) ->
+    Chest = #chest{x=X,y=Y,i=I},
+    ets:insert(Tab, {{chest, {X, Y}}, Chest}),
+    ok.
+
 %% TileId starts at 1 and maps to {0,0}
 %% The TileId 0 is invalid because of this
 tileid_to_pos(0, _) ->
@@ -163,12 +182,13 @@ read_map(MapName) ->
     {Json} = jiffy:decode(FileBin),
 
     Tab = ets:new(map1, [set, public, named_table, {write_concurrency, true}, {read_concurrency, true}]),
+    %% Map Property
+    ets:insert(Tab, {{property, filename}, File}),
+    Height = proplists:get_value(<<"height">>, Json), ets:insert(Tab, {{property, height}, Height}),
+    Width = proplists:get_value(<<"width">>, Json), ets:insert(Tab, {{property, width}, Width}),
+    TileSize = proplists:get_value(<<"tilesize">>, Json), ets:insert(Tab, {{property, tilesize}, TileSize}),
 
-    Height = proplists:get_value(<<"height">>, Json),
-    Width = proplists:get_value(<<"width">>, Json),
-    ets:insert(Tab, {{property, height}, Height}),
-    ets:insert(Tab, {{property, width}, Width}),
-
+    %% Read Data
     Collisions = proplists:get_value(<<"collisions">>, Json),
     [ets:insert(Tab, {{collision, X}, 1}) || X <- Collisions],
 
@@ -177,6 +197,16 @@ read_map(MapName) ->
 
     [insert_mobarea(Area, Tab) ||
         Area <- proplists:get_value(<<"roamingAreas">>, Json)],
+
+    [insert_door(Door, Tab) ||
+        Door <- proplists:get_value(<<"doors">>, Json)],
+
+    [insert_chestarea(Chest, Tab) ||
+        Chest <- proplists:get_value(<<"chestAreas">>, Json)],
+
+    [insert_chest(Chest, Tab) ||
+        Chest <- proplists:get_value(<<"staticChests">>, Json)],
+
     {Entities} = proplists:get_value(<<"staticEntities">>, Json),
     insert_staticEntity(Entities, Width, Tab),
 

@@ -1,7 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% @author Gustav Simonsson <gustav.simonsson@gmail.com>
 %%% @doc
-%%% 
+%%%
 %%% @end
 %%% Created : 7 July 2012 by <gustav.simonsson@gmail.com>
 %%%-------------------------------------------------------------------
@@ -79,6 +79,6 @@ type_to_internal(<<"bluesword">>) -> ?BLUESWORD;
 type_to_internal(Unmapped) -> Unmapped.
 
 integer_to_boolean(0) ->
-    true;
+    false;
 integer_to_boolean(Int) when is_integer(Int) ->
-    false.
+    true.

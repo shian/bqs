@@ -1,6 +1,9 @@
 -record(map, {checkpoints, height, width, json, startingAreas, collisions}).
 -record(cp, {id, x, y, w, h, s}).
 -record(mobarea, {id, x, y, w, h, type, nb}).
+-record(door, {x, y, p, tcx, tcy, to, tx, ty}).
+-record(chestarea, {x, y, w, h, i, tx, ty}).
+-record(chest, {x, y, i}).
 -record(player_state, {
         id,
         name,
