@@ -82,9 +82,7 @@ init([Name, Armor, Weapon]) ->
     Id = bqs_entity_handler:generate_id("5"),
     Hitpoints = ?CALC_HP(get_armor_lvl(Armor)),
 
-    CPs = bqs_map:get_startingAreas(),
-    random:seed(erlang:now()),
-    #cp{x = PosX, y = PosY} = lists:nth(random:uniform(length(CPs)), CPs),
+    #cp{x = PosX, y = PosY} = bqs_map:get_startingAreas(),
     
     Zone = bqs_entity_handler:make_zone(PosX, PosY),
 
