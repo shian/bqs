@@ -23,25 +23,34 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
+-type pos_x() :: integer().
+-type pos_y() :: integer().
+-type tile() :: integer().
+-type pos() :: {pos_x(), pos_y()}.
+
 -define(SERVER, ?MODULE).
 -define(PROPERTY(X), ets:lookup_element(map1, {property, X}, 2)).
 %%%===================================================================
 %%% API
 %%%===================================================================
+-spec start_link(string()) -> {ok, pid()}|{error, any()}.
 start_link(FilePath) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [FilePath], []).
 
 %%%===================================================================
 %%% Game API
 %%%===================================================================
+-spec get_startingAreas() -> #cp{}.
 get_startingAreas() ->
     %% TODO random pickup
     ets:lookup_element(map1, {start_area, 1}, 2).
 
+-spec is_colliding(pos_x(), pos_y()) -> boolean().
 is_colliding(X, Y) ->
     TileId = pos_to_tileid(X, Y),
     ets:member(map1, {collision, TileId}).
 
+-spec is_out_of_bounds(pos_x(), pos_y()) -> boolean().
 is_out_of_bounds(X, Y) ->
     Width = ?PROPERTY(width),
     Height = ?PROPERTY(height),
@@ -49,12 +58,14 @@ is_out_of_bounds(X, Y) ->
 
 %% TileId starts at 1 and maps to {0,0}
 %% The TileId 0 is invalid because of this
+-spec tileid_to_pos(tile()) -> pos().
 tileid_to_pos(0) ->
     exit("Invalid TileId");
 tileid_to_pos(TileId) ->
     Width = ?PROPERTY(width),
     tileid_to_pos(TileId, Width).
 
+-spec pos_to_tileid(pos_x(), pos_y()) -> tile().
 pos_to_tileid(X, Y) ->
     Width = ?PROPERTY(width),
     (Y * Width) + X + 1.
@@ -89,9 +100,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 insert_checkpoint({[{<<"id">>, Id},
-                 {<<"x">>, X}, {<<"y">>, Y},
-                 {<<"w">>, W}, {<<"h">>, H},
-                 {<<"s">>, S}]}, Tab) ->
+                    {<<"x">>, X}, {<<"y">>, Y},
+                    {<<"w">>, W}, {<<"h">>, H},
+                    {<<"s">>, S}]}, Tab) ->
     case bqs_util:integer_to_boolean(S) of
         true ->
             ets:insert(Tab, {{check_point, Id}, #cp{id=Id, x=X, y=Y, w=W, h=H, s=true}}),
@@ -101,12 +112,12 @@ insert_checkpoint({[{<<"id">>, Id},
     end.
 
 insert_mobarea({[{<<"id">>, Id},
-              {<<"x">>, X},
-              {<<"y">>, Y},
-              {<<"width">>, W},
-              {<<"height">>, H},
-              {<<"type">>, Type},
-              {<<"nb">>, Nb}]}, Tab) ->
+                 {<<"x">>, X},
+                 {<<"y">>, Y},
+                 {<<"width">>, W},
+                 {<<"height">>, H},
+                 {<<"type">>, Type},
+                 {<<"nb">>, Nb}]}, Tab) ->
     Mob = #mobarea{id=Id,x=X,y=Y,w=W,h=H,type=Type,nb=Nb},
     ets:insert(Tab, {{mobarea, Id}, Mob}),
     [add_mob(Mob)|| _ <- lists:seq(1, Nb)], %spawn the enemies
@@ -162,10 +173,10 @@ read_map(MapName) ->
     [ets:insert(Tab, {{collision, X}, 1}) || X <- Collisions],
 
     [insert_checkpoint(Point, Tab) ||
-                     Point <- proplists:get_value(<<"checkpoints">>, Json)],
+        Point <- proplists:get_value(<<"checkpoints">>, Json)],
 
     [insert_mobarea(Area, Tab) ||
-                       Area <- proplists:get_value(<<"roamingAreas">>, Json)],
+        Area <- proplists:get_value(<<"roamingAreas">>, Json)],
     {Entities} = proplists:get_value(<<"staticEntities">>, Json),
     insert_staticEntity(Entities, Width, Tab),
 
