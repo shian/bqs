@@ -122,6 +122,10 @@ handle_cast({event, From, ?WARRIOR,
 	    {noreply, State}
     end;
 
+%% event from other mob
+handle_cast({event, _From, _, _}, State) ->
+    {noreply, State};
+
 handle_cast({receive_damage, Amount}, 
             State = #mob_state{id = Id, zone = Zone, type = Type, hitpoints = HP,
                            item = Item, pos_x = X, pos_y = Y}) ->
