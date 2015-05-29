@@ -43,8 +43,9 @@
 
 %%  WS messages
 %% Server have to send "go" at client connected, then client send HELLO to Server
+%% more detail https://github.com/micolous/BrowserQuest/blob/master/doc/server/protocol.md
 %%                      % C  -> S              % C <-  S                       %
--define(HELLO, 0).      % name type weapon     %                               %
+-define(HELLO, 0).      % name armor weapon     %                               %
 -define(WELCOME, 1).    %                      % id name x y hp                %
 -define(SPAWN, 2).      %                      % id kind x y                   %
 -define(DESPAWN, 3).    %                      % id                            %
