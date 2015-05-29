@@ -27,7 +27,7 @@ start(_StartType, _StartArgs) ->
     Handlers = case application:get_env(client_dir) of
                    undefined ->
                        [{"/", bqs_handler, []}];
-                   Dir ->
+                   {ok, Dir} ->
                        [{"/bq/[...]", cowboy_static, {dir, Dir}},
                         {"/shared/[...]", cowboy_static, {dir, Dir}},
                         {"/", bqs_handler, []}]
