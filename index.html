@@ -2,13 +2,19 @@
     <html>  
     <head>  
     <script type="text/javascript">  
-    var ws = new Object;  
+    var ws = new Object;
+    var player_id;
       
-    function send()  
-    {  
-        ws.send("hello world!");  
-        console.log('Message sent');  
-    }  
+    function send(Msg)
+    {
+        var S = JSON.stringify(Msg);
+        ws.send(S);
+        console.log('Send: ' + S);
+    }
+
+    function send_hello(){
+        send([0,"test",20,60]);
+    }
       
     function open()  
     {  
@@ -19,28 +25,47 @@
         /* @todo: Change to your own server IP address */  
         ws = new WebSocket("ws://127.0.0.1:8000");  
         ws.onopen = function() {  
-            console.log('Connected');  
+            console.log('Connected');
         };  
-        ws.onmessage = function (evt)  
-        {  
+        ws.onmessage = function (evt) {
             var received_msg = evt.data;  
-            console.log("Received: " + received_msg);  
-            var txt = document.createTextNode(  
-                "Simon says: " + received_msg  
-            );  
-            document.getElementById('msgs').appendChild(txt);  
+            console.log('Received: ' + received_msg);
+
+            if(received_msg=="go") {
+                send_hello();
+                return;
+            }
+
+            var m = JSON.parse(received_msg);
+            onmessage(m);
         };  
         ws.onclose = function()  
         {  
             console.log('Connection closed');  
         };  
-    }  
+    }
+
+    function onmessage(m) {
+        var action = m.pop();
+        switch(action) {
+            case 1: // WELCOME
+                player_id = m[0];
+                break;
+        }
+    }
+
+    function move_to () {
+        var x = document.getElementById("moveX");
+        var y = document.getElementById("moveY");
+        send([4, x.value, y.value]);
+    }
+
     </script>  
     </head>  
-    <body>  
+    <body>
     <div id="sse">  
        <a href="javascript:open()">Open websocket connection</a><br/>  
-       <a href="javascript:send()">Send Message</a>  
+       <a href="javascript:move_to()">Move To</a><input id="moveX"><input id="moveY">
     </div>  
     <div id="msgs">  
     </div>  
