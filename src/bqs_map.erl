@@ -10,23 +10,20 @@
 -behaviour(gen_server).
 
 -include("../include/bqs.hrl").
+-include("bqs_type.hrl").
+
 %% API
 -export([start_link/1,
-         get_startingAreas/0,
-         is_colliding/2,
-         is_out_of_bounds/2,
-         tileid_to_pos/1,
-         pos_to_tileid/2
-        ]).
+    get_startingAreas/0,
+    is_colliding/2,
+    is_out_of_bounds/2,
+    tileid_to_pos/1,
+    pos_to_tileid/2
+    , move_to/4, make_zone/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
-
--type pos_x() :: integer().
--type pos_y() :: integer().
--type tile() :: integer().
--type pos() :: {pos_x(), pos_y()}.
 
 -define(SERVER, ?MODULE).
 -define(PROPERTY(X), ets:lookup_element(map1, {property, X}, 2)).
@@ -56,6 +53,22 @@ is_out_of_bounds(X, Y) ->
     Height = ?PROPERTY(height),
     (X < 1) or (X >= Width) or (Y < 1) or (Y >= Height).
 
+-spec move_to(pos_x(), pos_y(), pos_x(), pos_y()) -> {ok, pos_x(), pos_y(), zone()} | {error, any()}.
+move_to(_OldX, _OldY, X, Y) ->
+    case is_out_of_bounds(X, Y) of
+        true ->
+            lager:debug("out of bound: ~p, ~p", [X, Y]),
+            {error, out_of_bound};
+        _ ->
+            case is_colliding(X, Y) of
+                true ->
+                    lager:debug("colliding: ~p, ~p", [X, Y]),
+                    {error, colliding};
+                _ ->
+                    {ok, X, Y, make_zone(X, Y)}
+            end
+    end.
+
 %% TileId starts at 1 and maps to {0,0}
 %% The TileId 0 is invalid because of this
 -spec tileid_to_pos(tile()) -> pos().
@@ -69,6 +82,10 @@ tileid_to_pos(TileId) ->
 pos_to_tileid(X, Y) ->
     Width = ?PROPERTY(width),
     (Y * Width) + X + 1.
+
+-spec make_zone(pos_x(), pos_y()) -> zone().
+make_zone(PosX, PosY) ->
+    ((PosX div 28)+1)*((PosY div 12)+1).
 
 %%%===================================================================
 %%% gen_server callbacks

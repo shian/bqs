@@ -74,22 +74,22 @@
 -define(CHECK, 26).     %                      % *                             %
 
 % Game items
--define(WARRIOR, 1).
+-define(WARRIOR, warrior).
 
 % Mobs
--define(RAT, 2).
--define(SKELETON, 3).
--define(GOBLIN, 4).
--define(OGRE, 5).
--define(SPECTRE, 6).
--define(CRAB, 7).
--define(BAT, 8).
--define(WIZARD, 9).
--define(EYE, 10).
--define(SNAKE, 11).
--define(SKELETON2, 12).
--define(BOSS, 13).
--define(DEATHKNIGHT, 14).
+-define(RAT, rat).
+-define(SKELETON, skeleton).
+-define(GOBLIN, goblin).
+-define(OGRE, ogre).
+-define(SPECTRE, spectre).
+-define(CRAB, crab).
+-define(BAT, bat).
+-define(WIZARD, wizard).
+-define(EYE, eye).
+-define(SNAKE, snake).
+-define(SKELETON2, skeleton2).
+-define(BOSS, boss).
+-define(DEATHKNIGHT, deathknight).
 
 % Armors
 -define(FIREFOX, 20).

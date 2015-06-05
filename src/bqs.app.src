@@ -10,7 +10,8 @@
                   stdlib,
                   compiler,
                   crypto,
-                  syntax_tools
+                  syntax_tools,
+                  gproc
                  ]},
   {mod, { bqs_app, []}},
   {env, [
