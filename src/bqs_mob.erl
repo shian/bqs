@@ -50,19 +50,18 @@ get_stats(Target) ->
 init([BinType, X, Y]) ->
     Id = bqs_entity_handler:generate_id("1"),
     Zone = bqs_map:make_zone(X, Y),
-    Type = bqs_util:type_to_internal(BinType),
-    Orientation = random:uniform(4),
+    Orientation = lists:nth(random:uniform(4), [?DOWN, ?UP, ?LEFT, ?RIGHT]),
     State = do_init(
-              Type,
-              #mob_state{id = Id, type = Type,
-                         pos_x = X, pos_y = Y,
+              BinType,
+              #mob_state{id = Id, type = BinType,
+                         pos_x = X, pos_y = Y, zone=Zone,
                          orientation = Orientation}
              ),
 
     gproc:reg({n, l, Id}),
-    gproc:mreg(p, l, [{{type, Type}, 1}, {{zone, Zone}, 1}]),
+    gproc:mreg(p, l, [{{type, BinType}, 1}, {{zone, Zone}, 1}]),
     lager:debug("registering ~p {~p, ~p}", [BinType, X, Y]),
-    {ok, State#mob_state{zone = Zone, id = Id, type = Type}}.
+    {ok, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 handle_call({get_stats}, _From, State = #mob_state{id = Id, weapon = Weapon, armor = Armor}) ->

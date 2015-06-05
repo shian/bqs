@@ -91,8 +91,8 @@ init([Name, Armor, Weapon]) ->
     Zone = bqs_map:make_zone(PosX, PosY),
 
     gproc:reg({n, l, Id}),
-    gproc:mreg(p, l, [{name, Name}, {{type, warrior}, 1}, {{zone, Zone}, 1}]),
-    bqs_event:to_zone(Zone, #spawn{id=Id, type=warrior, x=PosX, y=PosY, orientation = down}),
+    gproc:mreg(p, l, [{name, Name}, {{type, ?WARRIOR}, 1}, {{zone, Zone}, 1}]),
+    bqs_event:to_zone(Zone, #spawn{id=Id, type=?WARRIOR, x=PosX, y=PosY, orientation = ?DOWN}),
 
     lager:debug("Player zone: ~p", [Zone]),
     {ok, #player_state{
@@ -110,14 +110,8 @@ init([Name, Armor, Weapon]) ->
            }}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% from websocket
-handle_call({get_status}, _From,
-            State = #player_state{id = Id, name = Name, zone = Zone,
-                                  pos_x = X, pos_y = Y, hitpoints = HP,
-                                  armor = Armor, weapon = Weapon}) ->
-    %%Action = {action, [true, ?SPAWN, Id,
-    %%                   ?WARRIOR, X, Y, Name, ?DOWN, Armor, Weapon]},
-    %%bqs_entity_handler:register(Zone, ?WARRIOR, Id, Action),
-    {reply, {ok, [Id, Name, X, Y, HP]}, State};
+handle_call({get_status}, _From, State) ->
+    {reply, {ok, State#player_state{actionlist = [], local_cache = []}}, State};
 
 %%% 在地圖上移動
 handle_call({move, X, Y}, _From,
@@ -135,13 +129,13 @@ handle_call({move, X, Y}, _From,
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = X, y = Y},
             bqs_event:to_zone(Zone, M),
             bqs_event:to_zone(Zone, #despawn{id=Id}),
-            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X, y=Y, orientation = down}),
+            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X, y=Y, orientation = ?DOWN}),
             {reply, {ok, M}, State#player_state{pos_x = X, pos_y = Y, zone=NewZone}};
         {ok, X1, Y1, NewZone} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
             bqs_event:to_zone(Zone, M),
             bqs_event:to_zone(Zone, #despawn{id=Id}),
-            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X1, y=Y1, orientation = down}),
+            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X1, y=Y1, orientation = ?DOWN}),
             {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
         {error, _} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = OldX, y = OldY},

@@ -15,8 +15,8 @@
                  ]},
   {mod, { bqs_app, []}},
   {env, [
-        {world_map, "world_map.json"},
-  	{listening_port, 8000},
-	{tick_time, 1000}
-  ]}
+         {world_map, "world_map.json"},
+         {listening_port, 8000},
+         {tick_time, 1000}
+        ]}
  ]}.

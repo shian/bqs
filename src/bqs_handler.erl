@@ -10,18 +10,16 @@
 
 -include("bqs_type.hrl").
 
-% Behaviour cowboy_websocket_handler
+                                                % Behaviour cowboy_websocket_handler
 -export([init/3,
          websocket_init/3,
          websocket_handle/3,
          websocket_info/3,
-         websocket_terminate/3  
-        ]).  
+         websocket_terminate/3
+        ]).
 
-% Internal export
+                                                % Internal export
 -export([make_tick/2]).
-
--define(APP, bqs).
 
 -record(state, {player, tick_time}).
 
@@ -57,118 +55,46 @@
 -define(OPEN, 25).      % chest                %                               %
 -define(CHECK, 26).     %                      % *                             %
 
-% Game items
--define(WARRIOR, 1).
-
-% Mobs
--define(RAT, 2).
--define(SKELETON, 3).
--define(GOBLIN, 4).
--define(OGRE, 5).
--define(SPECTRE, 6).
--define(CRAB, 7).
--define(BAT, 8).
--define(WIZARD, 9).
--define(EYE, 10).
--define(SNAKE, 11).
--define(SKELETON2, 12).
--define(BOSS, 13).
--define(DEATHKNIGHT, 14).
-
-% Armors
--define(FIREFOX, 20).
--define(CLOTHARMOR, 21).
--define(LEATHERARMOR, 22).
--define(MAILARMOR, 23).
--define(PLATEARMOR, 24).
--define(REDARMOR, 25).
--define(GOLDENARMOR, 26).
-
-% Objects
--define(FLASK, 35).
--define(BURGER, 36).
--define(CHEST, 37).
--define(FIREPOTION, 38).
--define(CAKE, 39).
-
-% NPCs
--define(GUARD, 40).
--define(KING, 41).
--define(OCTOCAT, 42).
--define(VILLAGEGIRL, 43).
--define(VILLAGER, 44).
--define(PRIEST, 45).
--define(SCIENTIST, 46).
--define(AGENT, 47).
--define(RICK, 48).
--define(NYAN, 49).
--define(SORCERER, 50).
--define(BEACHNPC, 51).
--define(FORESTNPC, 52).
--define(DESERTNPC, 53).
--define(LAVANPC, 54).
--define(CODER, 55).
-
-% Weapons
--define(SWORD1, 60).
--define(SWORD2, 61).
--define(REDSWORD, 62).
--define(GOLDENSWORD, 63).
--define(MORNINGSTAR, 64).
--define(AXE, 65).
--define(BLUESWORD, 66).
-
-
-%% Orientations
--define(UP, 1).
--define(DOWN, 2).
--define(LEFT, 3).
--define(RIGHT, 4).
-
-
 %%%===================================================================
 %%% API
 %%%===================================================================
-% Called to know how to dispatch a new connection.  
-init({tcp, http}, Req, _Opts) ->  
-    lager:debug("Request: ~p", [Req]),  
-    % "upgrade" every request to websocket,  
-    % we're not interested in serving any other content.
+                                                % Called to know how to dispatch a new connection.
+init({tcp, http}, Req, _Opts) ->
+    lager:debug("Request: ~p", [Req]),
+                                                % "upgrade" every request to websocket,
+                                                % we're not interested in serving any other content.
     {upgrade, protocol, cowboy_websocket}.
 
-% Called for every new websocket connection.  
-websocket_init(tcp, Req, []) ->  
+                                                % Called for every new websocket connection.
+websocket_init(tcp, Req, []) ->
     lager:debug("New client"),
-    
+
     self() ! <<"Send gogo">>,
-
-    {ok, TickTime} = application:get_env(?APP, tick_time),
-
+    {ok, TickTime} = application:get_env(bqs, tick_time),
     spawn(?MODULE, make_tick, [self(), TickTime]),
+    {ok, Req, #state{tick_time = TickTime}}.
 
-    {ok, Req, #state{tick_time = TickTime}}.  
-
-websocket_handle({text, Msg}, Req, State) ->  
+websocket_handle({text, Msg}, Req, State) ->
     Args = jiffy:decode(Msg),
     {Type, Reply, NewState} = parse_action(Args, State),
-    
+
     case Type of
-	json ->
-	    self() ! {json, Reply}, Req, State,
-	    {ok, Req, NewState};
-	_ ->
-	    {ok, Req, NewState}
+        json ->
+            self() ! {json, Reply}, Req, State,
+            {ok, Req, NewState};
+        _ ->
+            {ok, Req, NewState}
     end;
-  
-% With this callback we can handle other kind of  
-% messages, like binary.  
-websocket_handle(_Any, Req, State) ->  
+
+                                                % With this callback we can handle other kind of
+                                                % messages, like binary.
+websocket_handle(_Any, Req, State) ->
     bqs_util:unexpected_info(
       ?MODULE,"websocket binary received", State),
-    {ok, Req, State}.  
+    {ok, Req, State}.
 
 
-% Called when a text message arrives. 
+                                                % Called when a text message arrives.
 websocket_info(<<"Send gogo">>, Req, State) ->
     lager:debug("Sending 'go' message to client"),
     {reply, {text, <<"go">>}, Req, State};
@@ -178,11 +104,11 @@ websocket_info(<<"tick">>, Req, State = #state{player = undefined}) ->
 
 websocket_info(<<"tick">>, Req, State = #state{player = Player}) ->
     case bqs_player:get_surrondings(Player) of
-	[] ->
-	    ok;
-	ActionList ->
-	    lager:debug("Sending actionlist: ~p", [ActionList]),
-	    self() ! {json, [trans(X) || X <- ActionList]}
+        [] ->
+            ok;
+        ActionList ->
+            lager:debug("Sending actionlist: ~p", [ActionList]),
+            self() ! {json, [trans(X) || X <- ActionList]}
     end,
     {ok, Req, State};
 
@@ -190,12 +116,12 @@ websocket_info({json, Message}, Req, State) ->
     Json = jiffy:encode(Message),
     lager:debug("Sending json: ~p", [Json]),
     {reply, {text, Json}, Req, State};
-  
+
 websocket_info(Msg, Req, State) ->
     lager:debug("Got unknown message: ~p", [Msg]),
     {ok, Req, State}.
 
-websocket_terminate(_Reason, _Req, #state{player = Player}) ->      
+websocket_terminate(_Reason, _Req, #state{player = Player}) ->
     lager:debug("Connection closed"),
     bqs_player:stop(Player),
     ok.
@@ -206,8 +132,8 @@ websocket_terminate(_Reason, _Req, #state{player = Player}) ->
 parse_action([?HELLO, Name, Armor, Weapon], State) ->
     %% This is a player call
     {ok, Player} = bqs_player:start_link(Name, Armor, Weapon),
-    {ok, Status} = bqs_player:get_status(Player),
-    {json, [?WELCOME|Status], State#state{player = Player}};
+    {ok, #player_state{id=Id, pos_x=X, pos_y=Y, hitpoints=HP}} = bqs_player:get_status(Player),
+    {json, [?WELCOME, Id, Name, X, Y, HP], State#state{player = Player}};
 
 parse_action([?MOVE, X, Y], State = #state{player = Player}) ->
     {ok, #move{id=Id, x=X, y=Y}} = bqs_player:move(Player, X, Y),
@@ -254,16 +180,94 @@ parse_action(ActionList, _State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 trans(#spawn{id=Id, type=Type, x=X, y=Y}) ->
-    [?SPAWN, Id, Type, X, Y].
+    [?SPAWN, Id, type_to_integer(Type), X, Y].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 make_tick(Node, TickTime) ->
     Node ! <<"tick">>,
-    receive 
-	stop ->
-	    ok
-    after 
-	TickTime ->
-	    make_tick(Node, TickTime)
+    receive
+        stop ->
+            ok
+    after
+        TickTime ->
+            make_tick(Node, TickTime)
+    end.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+type_to_integer(Type) ->
+    case lists:keyfind(Type, 1, game_type()) of
+        I when is_integer(I) ->
+            I;
+        _ ->
+            0
     end.
 
+integer_to_type(I) when is_integer(I) ->
+    case lists:keyfind(I, 2, game_type()) of
+        false ->
+            undefined;
+        T ->
+            T
+    end.
+
+game_type() ->
+    [%% player
+     {?WARRIOR, 1},
+     %% Mobs
+     {?RAT, 2},
+     {?SKELETON, 3},
+     {?GOBLIN, 4},
+     {?OGRE, 5},
+     {?SPECTRE, 6},
+     {?CRAB, 7},
+     {?BAT, 8},
+     {?WIZARD, 9},
+     {?EYE, 10},
+     {?SNAKE, 11},
+     {?SKELETON2, 12},
+     {?BOSS, 13},
+     {?DEATHKNIGHT, 14},
+     %% Armors
+     {?FIREFOX, 20},
+     {?CLOTHARMOR, 21},
+     {?LEATHERARMOR, 22},
+     {?MAILARMOR, 23},
+     {?PLATEARMOR, 24},
+     {?REDARMOR, 25},
+     {?GOLDENARMOR, 26},
+     %% item
+     {?FLASK, 35},
+     {?BURGER, 36},
+     {?CHEST, 37},
+     {?FIREPOTION, 38},
+     {?CAKE, 39},
+     %% NPC
+     {?GUARD, 40},
+     {?KING, 41},
+     {?OCTOCAT, 42},
+     {?VILLAGEGIRL, 43},
+     {?VILLAGER, 44},
+     {?PRIEST, 45},
+     {?SCIENTIST, 46},
+     {?AGENT, 47},
+     {?RICK, 48},
+     {?NYAN, 49},
+     {?SORCERER, 50},
+     {?BEACHNPC, 51},
+     {?FORESTNPC, 52},
+     {?DESERTNPC, 53},
+     {?LAVANPC, 54},
+     {?CODER, 55},
+     %% Weapons
+     {?SWORD1, 60},
+     {?SWORD2, 61},
+     {?REDSWORD, 62},
+     {?GOLDENSWORD, 63},
+     {?MORNINGSTAR, 64},
+     {?AXE, 65},
+     {?BLUESWORD, 66},
+     %% Orientations
+     {?UP, 1},
+     {?DOWN, 2},
+     {?LEFT, 3},
+     {?RIGHT, 4}
+    ].

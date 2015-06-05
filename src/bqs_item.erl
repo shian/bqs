@@ -10,6 +10,8 @@
 -behaviour(gen_server).
 
 -include("../include/bqs.hrl").
+-include("bqs_type.hrl").
+
 %% API
 -export([create/4, start_link/4]).
 
