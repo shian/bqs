@@ -13,7 +13,7 @@
 -include("bqs_type.hrl").
 
 %% API
--export([start_link/3, receive_damage/2, get_stats/1]).
+-export([start_link/3, receive_damage/2, get_status/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -36,36 +36,36 @@ receive_damage(Target, Amount) ->
     {ok, Pid} = bqs_entity_handler:get_target(Target),
     receive_damage(Pid, Amount).
 
-get_stats(Pid) when is_pid(Pid) ->
+get_status(Pid) when is_pid(Pid) ->
     lager:debug("Trying to get stats from Pid: ~p", [Pid]),
-    gen_server:call(Pid, {get_stats});
-get_stats(Target) ->
-    {ok, Pid} = bqs_entity_handler:get_target(Target),
-    get_stats(Pid).
+    gen_server:call(Pid, {get_status}).
 
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 init([BinType, X, Y]) ->
-    Id = bqs_entity_handler:generate_id("1"),
-    Zone = bqs_map:make_zone(X, Y),
-    Orientation = lists:nth(random:uniform(4), [?DOWN, ?UP, ?LEFT, ?RIGHT]),
-    State = do_init(
-              BinType,
-              #mob_state{id = Id, type = BinType,
-                         pos_x = X, pos_y = Y, zone=Zone,
-                         orientation = Orientation}
-             ),
+    case find_module(BinType) of
+        undefined ->
+            lager:error("Unknown mob type initialization: ~p", [BinType]),
+            {stop, {undefined, BinType}};
+        M ->
+            Id = bqs_entity_handler:generate_id("1"),
+            Zone = bqs_map:make_zone(X, Y),
+            Orientation = lists:nth(random:uniform(4), [?DOWN, ?UP, ?LEFT, ?RIGHT]),
 
-    gproc:reg({n, l, Id}),
-    gproc:mreg(p, l, [{{type, BinType}, 1}, {{zone, Zone}, 1}]),
-    lager:debug("registering ~p {~p, ~p}", [BinType, X, Y]),
-    {ok, State}.
+            State = M:on_init(#mob_state{id = Id, type = BinType, module = M,
+                                         pos_x = X, pos_y = Y, zone=Zone, orientation = Orientation}),
+
+            gproc:reg({n, l, Id}),
+            gproc:mreg(p, l, [{{type, BinType}, 1}, {{zone, Zone}, 1}]),
+            lager:debug("registering ~p {~p, ~p}", [BinType, X, Y]),
+            {ok, State}
+    end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_call({get_stats}, _From, State = #mob_state{id = Id, weapon = Weapon, armor = Armor}) ->
-    {reply, {ok, {Id, Weapon, Armor}}, State};
+handle_call({get_status}, _From, State) ->
+    {reply, {ok, State#mob_state{attackers=[]}}, State};
 
 handle_call(Request, From, State) ->
     bqs_util:unexpected_call(?MODULE, Request, From, State),
@@ -149,14 +149,18 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_info(#spawn{from = Pid}, State = #mob_state{id = Id, type = Type,
-                                                   pos_x = X, pos_y = Y,
-                                                   orientation = Orientation}) ->
+handle_info(#spawn{from = Pid}=Evt, #mob_state{module=M} = State) ->
+    NewState = #mob_state{id = Id, type = Type,
+                          pos_x = X, pos_y = Y,
+                          orientation = Orientation} = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, #spawn{id=Id, type=Type, x=X, y=Y, orientation = Orientation}),
-    {noreply, State};
-handle_info(Info, State) ->
-    bqs_util:unexpected_info(?MODULE, Info, State),
-    {noreply, State}.
+    {noreply, NewState};
+handle_info(#move{}=Evt, #mob_state{module=M}=State) ->
+    NewState = M:on_event(Evt, State),
+    {noreply, NewState};
+handle_info(Evt, #mob_state{module=M}=State) ->
+    NewState = M:on_event(Evt, State),
+    {noreply, NewState}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 terminate(_Reason, _State) ->
@@ -179,148 +183,17 @@ drop_item(Item, X, Y) ->
     spawn(Fun),
     ok.
 
-%% Calculate the item dropped. The Item list needs to be sorted in ascending
-%% order for it to work properly.
-item([], _) -> undefined;
-item([{Item, Chance} | _Items], Rand) when Rand =< Chance ->
-    Item;
-item([_ | Items], Rand) ->
-    item(Items, Rand).
-
-do_init(?RAT, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?BURGER, 15},
-             {?FLASK, 55}],
-
-    State#mob_state{hitpoints = 25,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?CLOTHARMOR,
-                    range = 1,
-                    weapon = ?SWORD1};
-do_init(?SKELETON, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?AXE, 25},
-             {?MAILARMOR, 35},
-             {?FLASK, 75}],
-
-    State#mob_state{hitpoints = 110,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 3,
-                    weapon = ?SWORD2};
-do_init(?GOBLIN, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?AXE, 15},
-             {?MAILARMOR, 35},
-             {?FLASK, 75}],
-
-    State#mob_state{hitpoints = 90,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 3,
-                    weapon = ?SWORD1};
-do_init(?OGRE, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?BURGER, 15},
-             {?PLATEARMOR, 35},
-             {?MORNINGSTAR, 55},
-             {?FLASK, 100}],
-
-    State#mob_state{hitpoints = 200,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?MAILARMOR,
-                    range = 3,
-                    weapon = ?SWORD2};
-do_init(?SPECTRE, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?REDSWORD, 35},
-             {?FLASK, 65},
-             {?REDARMOR, 100}],
-
-    State#mob_state{hitpoints = 250,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 2,
-                    weapon = ?GOLDENSWORD};
-do_init(?DEATHKNIGHT, State) ->
-    Drops = [{?BURGER, 95},
-             {?FIREPOTION, 100}],
-
-    State#mob_state{hitpoints = 250,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?MAILARMOR,
-                    range = 5,
-                    weapon = ?REDSWORD};
-do_init(?CRAB, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?LEATHERARMOR, 15},
-             {?AXE, 35},
-             {?FLASK, 85}],
-
-    State#mob_state{hitpoints = 60,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 5,
-                    weapon = ?SWORD1};
-do_init(?SNAKE, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?MORNINGSTAR, 15},
-             {?MAILARMOR, 25},
-             {?FLASK, 75}],
-
-    State#mob_state{hitpoints = 60,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 3,
-                    weapon = ?SWORD1};
-do_init(?SKELETON2, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?BLUESWORD, 20},
-             {?PLATEARMOR, 35},
-             {?FLASK, 95}],
-
-    State#mob_state{hitpoints = 200,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?MAILARMOR,
-                    range = 4,
-                    weapon = ?REDSWORD};
-do_init(?EYE, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?REDSWORD, 15},
-             {?REDARMOR, 35},
-             {?FLASK, 85}],
-
-    State#mob_state{hitpoints = 200,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?MAILARMOR,
-                    range = 1,
-                    weapon = ?REDSWORD};
-do_init(?BAT, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?AXE, 15},
-             {?FLASK, 65}],
-
-    State#mob_state{hitpoints = 80,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 2,
-                    weapon = ?SWORD1};
-do_init(?WIZARD, State) ->
-    Drops = [{?FIREPOTION, 5},
-             {?PLATEARMOR, 25},
-             {?FLASK, 75}],
-
-    State#mob_state{hitpoints = 100,
-                    item = item(Drops, random:uniform(100)),
-                    armor = ?LEATHERARMOR,
-                    range = 5,
-                    weapon = ?AXE};
-do_init(?BOSS, State) ->
-    State#mob_state{hitpoints = 100,
-                    item = ?GOLDENSWORD,
-                    armor = ?LEATHERARMOR,
-                    range = 9,
-                    weapon = ?AXE};
-do_init(_Type, State) ->
-    lager:error("Unknown mob type initialization"),
-    State.
+find_module(?RAT) -> bqs_mob_rat;
+find_module(?SKELETON) -> bqs_mob_skeleton;
+find_module(?GOBLIN) -> bqs_mob_goblin;
+find_module(?OGRE) -> bqs_mob_ogre;
+find_module(?SPECTRE) -> bqs_mob_spectre;
+find_module(?CRAB) -> bqs_mob_crab;
+find_module(?BAT) -> bqs_mob_bat;
+find_module(?WIZARD) -> bqs_mob_wizard;
+find_module(?EYE) -> bqs_mob_eye;
+find_module(?SNAKE) -> bqs_mob_snake;
+find_module(?SKELETON2) -> bqs_mob_skeleton2;
+find_module(?BOSS) -> bqs_mob_boss;
+find_module(?DEATHKNIGHT) -> bqs_mob_deathknight;
+find_module(_) -> undefined.

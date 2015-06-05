@@ -22,6 +22,26 @@
     local_cache
 }).
 
+-record(mob_state, {id,
+    module,
+    type,
+    hitpoints,
+    pos_x,
+    pos_y,
+    armor,
+    weapon,
+    hate,
+    hate_counter,
+    item,
+    respawn_timout,
+    return_timeout,
+    orientation, %TODO initalize in init
+    attackers = [],
+    range,
+    target,
+    zone
+}).
+
 %% entity enter map; enter zone
 -record(spawn, {from :: pid(),
                 id :: id(),

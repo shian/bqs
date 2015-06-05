@@ -192,7 +192,7 @@ handle_call({hit, Target}, _From,
     {reply, {ok, [?DAMAGE, Id, Dmg]}, State};
 
 handle_call({hit, Target}, _From, State = #player_state{weapon = Weapon}) ->
-    {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_stats(Target),
+    {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_status(Target),
     Dmg = bqs_entity_handler:calculate_dmg(
             get_armor_lvl(TargetArmor), get_weapon_lvl(Weapon)),
     bqs_mob:receive_damage(Target, Dmg),
@@ -214,7 +214,7 @@ handle_call({hurt, Attacker}, _From,
 
 handle_call({hurt, Attacker}, _From,
             State = #player_state{armor = Armor, hitpoints = HP}) ->
-    {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_stats(Attacker),
+    {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_status(Attacker),
     Dmg = bqs_entity_handler:calculate_dmg(
             get_weapon_lvl(TargetWeapon), get_armor_lvl(Armor)),
     lager:debug("Received ~p damage. Have totally ~p", [Dmg, HP]),

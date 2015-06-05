@@ -5,24 +5,7 @@
 -record(chestarea, {x, y, w, h, i, tx, ty}).
 -record(chest, {x, y, i}).
 
--record(mob_state, {id,
-        type,
-        hitpoints,
-        pos_x, 
-        pos_y,
-        armor,
-        weapon,
-        hate,
-        hate_counter,
-        item,
-        respawn_timout,
-        return_timeout,
-        orientation, %TODO initalize in init
-        attackers = [],
-        range,
-        target,
-        zone
-    }).
+
 
 
 -define(PLAYER_BUCKET, <<"player">>).
