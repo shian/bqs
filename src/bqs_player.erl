@@ -89,22 +89,23 @@ init([Name, Armor, Weapon]) ->
 
     gproc:reg({n, l, Id}),
     gproc:mreg(p, l, [{name, Name}, {{type, ?WARRIOR}, 1}, {{zone, Zone}, 1}]),
-    bqs_event:to_zone(Zone, #spawn{id=Id, type=?WARRIOR, x=PosX, y=PosY, orientation = ?DOWN}),
 
+    State = #entity{id = Id,
+                    name = Name,
+                    armor = Armor,
+                    weapon = Weapon,
+                    pos_x = PosX,
+                    pos_y = PosY,
+                    hp = Hitpoints,
+                    checkpoint = 0,
+                    zone = Zone,
+                    actionlist = [],
+                    local_cache = []
+                   },
+
+    bqs_event:to_zone(Zone, ?SPAWNMSG(State)),
     lager:debug("Player zone: ~p", [Zone]),
-    {ok, #entity{
-            id = Id,
-            name = Name,
-            armor = Armor,
-            weapon = Weapon,
-            pos_x = PosX,
-            pos_y = PosY,
-            hp = Hitpoints,
-            checkpoint = 0,
-            zone = Zone,
-            actionlist = [],
-            local_cache = []
-           }}.
+    {ok, State}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% from websocket
 handle_call({get_status}, _From, State) ->
@@ -175,7 +176,7 @@ handle_call({attack, Target}, _From, State = #entity{zone = Zone}) ->
 
 handle_call({hit, Target}, _From,
             State = #entity{local_cache = {Target, {Id, _, Armor}},
-                                  weapon = Weapon}) ->
+                            weapon = Weapon}) ->
     Dmg = bqs_entity_handler:calculate_dmg(
             get_armor_lvl(Armor), get_weapon_lvl(Weapon)),
     bqs_mob:receive_damage(Target, Dmg),
@@ -191,7 +192,7 @@ handle_call({hit, Target}, _From, State = #entity{weapon = Weapon}) ->
 
 handle_call({hurt, Attacker}, _From,
             State = #entity{armor = Armor, hp = HP,
-                                  local_cache = {_Target, {Attacker, TargetWeapon, _}}}) ->
+                            local_cache = {_Target, {Attacker, TargetWeapon, _}}}) ->
     Dmg = bqs_entity_handler:calculate_dmg(
             get_weapon_lvl(TargetWeapon), get_armor_lvl(Armor)),
     lager:debug("Received ~p damage. Have totally ~p", [Dmg, HP]),
@@ -227,7 +228,7 @@ handle_cast({stop}, State) ->
 handle_cast({event, From, _,
              {action, [Initial,?SPAWN|Tl]}},
             State = #entity{id = Id, pos_x = X, pos_y = Y, name = Name,
-                                  armor = Armor, weapon = Weapon, actionlist = ActionList}) ->
+                            armor = Armor, weapon = Weapon, actionlist = ActionList}) ->
     lager:debug("Action received: ~p", [[Initial,?SPAWN|Tl]]),
     case Initial of
         true ->
@@ -255,7 +256,7 @@ handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
     {noreply, State}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% action from other entity
+                                                % action from other entity
 handle_info(#spawn{}=M, #entity{actionlist = ActionList}=State) ->
     {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(Info, State) ->
