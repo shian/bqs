@@ -18,11 +18,11 @@ on_init(State) ->
     Drops = [{95, ?BURGER},
              {100, ?FIREPOTION}],
 
-    State#mob_state{hitpoints = 250,
-                    item = bqs_util:percent_pick(Drops),
-                    armor = ?MAILARMOR,
-                    range = 5,
-                    weapon = ?REDSWORD}.
+    State#entity{hp = 250,
+                 item = bqs_util:percent_pick(Drops),
+                 armor = ?MAILARMOR,
+                 range = 5,
+                 weapon = ?REDSWORD}.
 
 on_event(_Evt, State) ->
     State.

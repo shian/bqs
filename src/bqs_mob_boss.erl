@@ -15,11 +15,11 @@
 -export([on_init/1, on_event/2]).
 
 on_init(State) ->
-    State#mob_state{hitpoints = 100,
-                    item = ?GOLDENSWORD,
-                    armor = ?LEATHERARMOR,
-                    range = 9,
-                    weapon = ?AXE}.
+    State#entity{hp = 100,
+                 item = ?GOLDENSWORD,
+                 armor = ?LEATHERARMOR,
+                 range = 9,
+                 weapon = ?AXE}.
 
 on_event(_Evt, State) ->
     State.

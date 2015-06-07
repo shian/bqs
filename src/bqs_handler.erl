@@ -132,7 +132,7 @@ websocket_terminate(_Reason, _Req, #state{player = Player}) ->
 parse_action([?HELLO, Name, Armor, Weapon], State) ->
     %% This is a player call
     {ok, Player} = bqs_player:start_link(Name, Armor, Weapon),
-    {ok, #player_state{id=Id, pos_x=X, pos_y=Y, hitpoints=HP}} = bqs_player:get_status(Player),
+    {ok, #entity{id=Id, pos_x=X, pos_y=Y, hp=HP}} = bqs_player:get_status(Player),
     {json, [?WELCOME, Id, Name, X, Y, HP], State#state{player = Player}};
 
 parse_action([?MOVE, X, Y], State = #state{player = Player}) ->

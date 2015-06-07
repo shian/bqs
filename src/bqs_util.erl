@@ -13,7 +13,7 @@
     unexpected_cast/3,
     unexpected_info/3,
     integer_to_boolean/1
-    , percent_pick/1]).
+    , percent_pick/1, random_pick/1]).
 
 unexpected_call(Module, Request, From, State) ->
     lager:warning("[~p] Unexpected call, Request: ~p, From: ~p, State: ~p~n",
@@ -46,3 +46,8 @@ percent_pick1([{Chance, Item} | _Items], Rand) when Rand =< Chance ->
 percent_pick1([_ | Items], Rand) ->
     percent_pick1(Items, Rand).
 
+-spec random_pick(list()) -> any().
+random_pick([]) ->
+    undefined;
+random_pick(L) ->
+    lists:nth(random:uniform(length(L)), L).

@@ -7,42 +7,29 @@
 -type pos() :: {pos_x(), pos_y()}.
 -type orientation() :: up | down | left | right | undefined .
 
--record(player_state, {
-          id,
-          name,
-          type,
-          armor,
-          weapon,
-          hitpoints,
-          pos_x,
-          pos_y,
-          orientation,
-          checkpoint,
-          zone,
-          actionlist,
-          target,
-          local_cache
-         }).
-
--record(mob_state, {id,
-                    module,
-                    type,
-                    hitpoints,
-                    pos_x,
-                    pos_y,
-                    armor,
-                    weapon,
-                    hate,
-                    hate_counter,
-                    item,
-                    respawn_timout,
-                    return_timeout,
-                    orientation, %TODO initalize in init
-                    attackers = [],
-                    range,
-                    target,
-                    zone
-                   }).
+-record(entity, {id :: id(),
+                 module,
+                 name :: binary(),
+                 type :: binary(),
+                 armor,
+                 weapon,
+                 hp,
+                 pos_x,
+                 pos_y,
+                 orientation,
+                 checkpoint,
+                 zone,
+                 actionlist,
+                 target,
+                 local_cache,
+                 hate,
+                 hate_count,
+                 item,
+                 respawn_timeout,
+                 return_timeout,
+                 attackers = [],
+                 range
+                }).
 
 %% entity enter map; enter zone
 -record(spawn, {from :: pid(),
@@ -54,15 +41,17 @@
                 armor :: integer(),
                 weapon :: integer()}).
 
--define(SPAWNMSG(S), #spawn{from=self(), id=S#player_state.id,
-                            type=S#player_state.type, x=S#player_state.pos_x, y=S#player_state.pos_y,
-                            orientation = S#player_state.orientation, armor = S#player_state.armor,
-                            weapon = S#player_state.weapon}).
+-define(SPAWNMSG(E), #spawn{from=self(), id=E#entity.id,
+                            type=E#entity.type, x=E#entity.pos_x, y=E#entity.pos_y,
+                            orientation = E#entity.orientation, armor = E#entity.armor,
+                            weapon = E#entity.weapon}).
 
 %% entity leave map; leave zone
 -record(despawn, {from :: pid(),
                   id :: id()
                  }).
+
+-define(DESPAWNMSG(E), #despawn{from=self(), id=E#entity.id}).
 
 %% entity move from {old_x, old_y} to {x, y}
 -record(move, {from :: pid(),
@@ -72,6 +61,9 @@
                x :: pos_x(),
                y :: pos_y(),
                orientation :: orientation()}).
+
+-define(MOVEMSG(E), #move{from=self(), id=E#entity.id, x=E#entity.pos_x, y=E#entity.pos_y,
+                       orientation = E#entity.orientation}).
 
 %% Player
 -define(WARRIOR, <<"warrior">>).

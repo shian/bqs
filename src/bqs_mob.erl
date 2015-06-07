@@ -52,10 +52,10 @@ init([BinType, X, Y]) ->
         M ->
             Id = bqs_entity_handler:generate_id("1"),
             Zone = bqs_map:make_zone(X, Y),
-            Orientation = lists:nth(random:uniform(4), [?DOWN, ?UP, ?LEFT, ?RIGHT]),
+            Orientation = bqs_util:random_pick([?DOWN, ?UP, ?LEFT, ?RIGHT]),
 
-            State = M:on_init(#mob_state{id = Id, type = BinType, module = M,
-                                         pos_x = X, pos_y = Y, zone=Zone, orientation = Orientation}),
+            State = M:on_init(#entity{id = Id, type = BinType, module = M,
+                                      pos_x = X, pos_y = Y, zone=Zone, orientation = Orientation}),
 
             gproc:reg({n, l, Id}),
             gproc:mreg(p, l, [{{type, BinType}, 1}, {{zone, Zone}, 1}]),
@@ -65,14 +65,14 @@ init([BinType, X, Y]) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 handle_call({get_status}, _From, State) ->
-    {reply, {ok, State#mob_state{attackers=[]}}, State};
+    {reply, {ok, State#entity{attackers=[]}}, State};
 
 handle_call(Request, From, State) ->
     bqs_util:unexpected_call(?MODULE, Request, From, State),
     {reply, ok, State}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_cast({tick}, State = #mob_state{hate = _Hate, hitpoints = HP}) ->
+handle_cast({tick}, State = #entity{hate = _Hate, hp = HP}) ->
     case HP of
         Dead when Dead =< 0 ->
             die;
@@ -83,11 +83,11 @@ handle_cast({tick}, State = #mob_state{hate = _Hate, hitpoints = HP}) ->
 
 handle_cast({event, From, ?WARRIOR,
              {action, [?MOVE, _Id, ?WARRIOR, X, Y, _Name, _Orient, _Armor, _Weapon]}},
-            State = #mob_state{range = Range, pos_x = PX, pos_y = PY, hate = Hate})
+            State = #entity{range = Range, pos_x = PX, pos_y = PY, hate = Hate})
   when Hate =:= [] andalso ((PX - Range < X andalso X < (PX + Range))
                             orelse ((PY - Range) < Y andalso Y < (PY + Range))) ->
     %% Hates on for you
-    {noreply, State#mob_state{hate = [From]}};
+    {noreply, State#entity{hate = [From]}};
 
 handle_cast({event, _From, ?WARRIOR, {action, [?MOVE, _Id, ?WARRIOR, _X, _Y, _Name,
                                                _Orient, _Armor, _Weapon]}}, State) ->
@@ -97,28 +97,28 @@ handle_cast({event, _From, ?WARRIOR, {action, [?MOVE, _Id, ?WARRIOR, _X, _Y, _Na
 
 handle_cast({event, _From, ?WARRIOR, {action, [?ATTACK, Id]}}, State) ->
     %% Hates on for you
-    lager:debug("RETALIATE!", [State#mob_state.id, Id]),
-    bqs_entity_handler:event(State#mob_state.zone,
-                             State#mob_state.type,
-                             {action, [?ATTACK, State#mob_state.id]}),
+    lager:debug("RETALIATE!", [State#entity.id, Id]),
+    bqs_entity_handler:event(State#entity.zone,
+                             State#entity.type,
+                             {action, [?ATTACK, State#entity.id]}),
     {noreply, State};
 
 %% A hero have spawned in our zone
 handle_cast({event, From, ?WARRIOR,
              {action, [_, ?SPAWN, _Id, ?WARRIOR, _X, _Y, _Name, _Orient, _Armor, _Weapon]}},
-            State = #mob_state{id = Id, type = Type, pos_x = X, pos_y = Y}) ->
+            State = #entity{id = Id, type = Type, pos_x = X, pos_y = Y}) ->
     gen_server:cast(From, {event, self(), Id, {action, [false, ?SPAWN, Id, Type, X, Y]}}),
     {noreply, State};
 
 handle_cast({event, From, ?WARRIOR,
              {action, [?ATTACK, Target]}},
-            State = #mob_state{zone = Zone, type = Type, id = Id}) ->
+            State = #entity{zone = Zone, type = Type, id = Id}) ->
     case erlang:integer_to_list(Id) of
         Target ->
             %% I'm gonna KILL you
             bqs_entity_handler:event(
               Zone, Type, {action, [?ATTACK, Id]}),
-            {noreply, State#mob_state{hate = [From]}};
+            {noreply, State#entity{hate = [From]}};
         _ ->
             {noreply, State}
     end;
@@ -128,11 +128,11 @@ handle_cast({event, _From, _, _}, State) ->
     {noreply, State};
 
 handle_cast({receive_damage, Amount},
-            State = #mob_state{id = Id, zone = Zone, type = Type, hitpoints = HP,
+            State = #entity{id = Id, zone = Zone, type = Type, hp = HP,
                                item = Item, pos_x = X, pos_y = Y}) ->
     lager:debug("Receiving damage: ~p", [Amount]),
     Total = HP - Amount,
-    NewState = State#mob_state{hitpoints = Total},
+    NewState = State#entity{hp = Total},
     case Total =< 0 of
         true ->
             bqs_entity_handler:event(
@@ -148,18 +148,18 @@ handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
     {noreply, State}.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_info(#spawn{from = Pid}=Evt, #mob_state{module=M} = State) ->
-    NewState = #mob_state{id = Id, type = Type, pos_x = X, pos_y = Y,
+%%%% Entity Msg %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+handle_info(#spawn{from = Pid}=Evt, #entity{module=M} = State) ->
+    NewState = #entity{id = Id, type = Type, pos_x = X, pos_y = Y,
                           orientation = Orientation} = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, #spawn{id=Id, type=Type, x=X, y=Y, orientation = Orientation}),
     {noreply, NewState};
-handle_info(#move{from = Pid}=Evt, #mob_state{module=M, id=Id, type=Type, pos_x=X, pos_y=Y,
+handle_info(#move{from = Pid}=Evt, #entity{module=M, id=Id, type=Type, pos_x=X, pos_y=Y,
                                               orientation=Orientation}=State) ->
     NewState = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, #spawn{id=Id, type=Type, x=X, y=Y, orientation = Orientation}),
     {noreply, NewState};
-handle_info(Evt, #mob_state{module=M}=State) ->
+handle_info(Evt, #entity{module=M}=State) ->
     NewState = M:on_event(Evt, State),
     {noreply, NewState}.
 

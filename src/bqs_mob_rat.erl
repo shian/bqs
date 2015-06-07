@@ -14,16 +14,16 @@
 %% API
 -export([on_init/1, on_event/2]).
 
-on_init(#mob_state{}=State) ->
+on_init(State) ->
     Drops = [{5, ?FIREPOTION},
              {15, ?BURGER},
              {55, ?FLASK}],
 
-    State#mob_state{hitpoints = 25,
-                    item = bqs_util:percent_pick(Drops),
-                    armor = ?CLOTHARMOR,
-                    range = 1,
-                    weapon = ?SWORD1}.
+    State#entity{hp = 25,
+                 item = bqs_util:percent_pick(Drops),
+                 armor = ?CLOTHARMOR,
+                 range = 1,
+                 weapon = ?SWORD1}.
 
 on_event(_Evt, State) ->
     State.

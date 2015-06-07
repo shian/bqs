@@ -69,17 +69,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-new_player_state(ItemId, PS = #player_state{armor = Armor,
+new_player_state(ItemId, PS = #entity{armor = Armor,
                                             weapon = Weapon,
-                                            hitpoints = HP}) ->
+                                            hp = HP}) ->
     case item_id_to_type(ItemId) of
-        armor -> PS#player_state{armor = Armor + 1};
-        weapon -> PS#player_state{weapon = Weapon + 1};
-        flask -> PS#player_state{hitpoints = HP + 25};
-        burger -> PS#player_state{hitpoints = HP + 35};
-        cake -> PS#player_state{hitpoints = HP + 55};
+        armor -> PS#entity{armor = Armor + 1};
+        weapon -> PS#entity{weapon = Weapon + 1};
+        flask -> PS#entity{hp = HP + 25};
+        burger -> PS#entity{hp = HP + 35};
+        cake -> PS#entity{hp = HP + 55};
         %% Todo: invincibility?
-        firepotion -> PS#player_state{hitpoints = HP + 75}
+        firepotion -> PS#entity{hp = HP + 75}
     end.
        
 item_id_to_type(N) when N >= 20, N =< 26 ->

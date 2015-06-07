@@ -36,10 +36,7 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          terminate/2, code_change/3]).
 
--compile(export_all).
-
 -define(CALC_HP(ArmorLevel), 80 + ((ArmorLevel - 1) * 30)).
--define(APP, bqs).
 
 %%%===================================================================
 %%% API
@@ -95,14 +92,14 @@ init([Name, Armor, Weapon]) ->
     bqs_event:to_zone(Zone, #spawn{id=Id, type=?WARRIOR, x=PosX, y=PosY, orientation = ?DOWN}),
 
     lager:debug("Player zone: ~p", [Zone]),
-    {ok, #player_state{
+    {ok, #entity{
             id = Id,
             name = Name,
             armor = Armor,
             weapon = Weapon,
             pos_x = PosX,
             pos_y = PosY,
-            hitpoints = Hitpoints,
+            hp = Hitpoints,
             checkpoint = 0,
             zone = Zone,
             actionlist = [],
@@ -111,59 +108,60 @@ init([Name, Armor, Weapon]) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% from websocket
 handle_call({get_status}, _From, State) ->
-    {reply, {ok, State#player_state{actionlist = [], local_cache = []}}, State};
+    {reply, {ok, State#entity{actionlist = [], local_cache = []}}, State};
 
 %%% 在地圖上移動
 handle_call({move, X, Y}, _From,
-            State = #player_state{pos_x = OldX, pos_y = OldY, id = Id, zone = Zone}) ->
+            State = #entity{pos_x = OldX, pos_y = OldY, zone = Zone}) ->
     case bqs_map:move_to(OldX, OldY, X, Y) of
         {ok, X1, Y1, Zone} ->
-            M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
+            NewState = State#entity{pos_x = X1, pos_y = Y1},
+            M = ?MOVEMSG(NewState),
             bqs_event:to_zone(Zone, M),
-            {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
+            {reply, {ok, M}, NewState};
         {ok, X1, Y1, NewZone} ->
-            NewState = State#player_state{pos_x = X1, pos_y = Y1, zone=NewZone},
-            M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
+            NewState = State#entity{pos_x = X1, pos_y = Y1, zone=NewZone},
+            M = ?MOVEMSG(NewState),
             bqs_event:to_zone(Zone, M),
             gproc:unreg({p, l, {zone, Zone}}),
             gproc:reg({p, l, {zone, NewZone}}),
             bqs_event:to_zone(NewZone, ?SPAWNMSG(NewState)),
             {reply, {ok, M}, NewState};
         {error, _} ->
-            M = #move{id=Id, old_x = OldX, old_y = OldY, x = OldX, y = OldY},
+            M = ?MOVEMSG(State),
             {reply, {ok, M}, State}
     end;
 
 handle_call({set_checkpoint, Value}, _From, State) ->
-    {reply, ok, State#player_state{checkpoint = Value}};
+    {reply, ok, State#entity{checkpoint = Value}};
 
 handle_call({update_zone}, _From,
-            State = #player_state{pos_x = X, pos_y = Y, zone=Zone1}) ->
+            State = #entity{pos_x = X, pos_y = Y, zone=Zone1}) ->
     case bqs_entity_handler:make_zone(X, Y) of
         Zone1 ->
             {reply, ok, State};
         Zone2 ->
             gproc:unreg({p, l, {zone, Zone1}}),
             gproc:reg({p, l, {zone, Zone2}}),
-            NewState = State#player_state{zone = Zone2},
+            NewState = State#entity{zone = Zone2},
             bqs_event:to_zone(Zone2, ?SPAWNMSG(NewState)),
             lager:debug("update zone: ~p", [{Zone1, Zone2}]),
             {reply, ok, NewState}
     end;
 
-handle_call({get_zone}, _From, State = #player_state{zone = Zone}) ->
+handle_call({get_zone}, _From, State = #entity{zone = Zone}) ->
     {reply, {ok, Zone}, State};
 
 handle_call({get_surrondings}, _From,
-            State = #player_state{actionlist = ActionList}) ->
-    {reply, ActionList, State#player_state{actionlist = []}};
+            State = #entity{actionlist = ActionList}) ->
+    {reply, ActionList, State#entity{actionlist = []}};
 
-handle_call({chat, Message}, _From, State = #player_state{id = Id, zone = Zone}) ->
+handle_call({chat, Message}, _From, State = #entity{id = Id, zone = Zone}) ->
     Action = [?CHAT, Id, Message],
     bqs_entity_handler:event(Zone, ?WARRIOR, {action, Action}),
     {reply, {ok, Action}, State};
 
-handle_call({attack, Target}, _From, State = #player_state{zone = Zone}) ->
+handle_call({attack, Target}, _From, State = #entity{zone = Zone}) ->
     Action =
         case Target of
             _IntTarget when is_integer(Target) ->
@@ -176,45 +174,45 @@ handle_call({attack, Target}, _From, State = #player_state{zone = Zone}) ->
     {reply, ok, State};
 
 handle_call({hit, Target}, _From,
-            State = #player_state{local_cache = {Target, {Id, _, Armor}},
+            State = #entity{local_cache = {Target, {Id, _, Armor}},
                                   weapon = Weapon}) ->
     Dmg = bqs_entity_handler:calculate_dmg(
             get_armor_lvl(Armor), get_weapon_lvl(Weapon)),
     bqs_mob:receive_damage(Target, Dmg),
     {reply, {ok, [?DAMAGE, Id, Dmg]}, State};
 
-handle_call({hit, Target}, _From, State = #player_state{weapon = Weapon}) ->
+handle_call({hit, Target}, _From, State = #entity{weapon = Weapon}) ->
     {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_status(Target),
     Dmg = bqs_entity_handler:calculate_dmg(
             get_armor_lvl(TargetArmor), get_weapon_lvl(Weapon)),
     bqs_mob:receive_damage(Target, Dmg),
     {reply, {ok, [?DAMAGE, Id, Dmg]},
-     State#player_state{local_cache = {Target, {Id, TargetWeapon, TargetArmor}}}};
+     State#entity{local_cache = {Target, {Id, TargetWeapon, TargetArmor}}}};
 
 handle_call({hurt, Attacker}, _From,
-            State = #player_state{armor = Armor, hitpoints = HP,
+            State = #entity{armor = Armor, hp = HP,
                                   local_cache = {_Target, {Attacker, TargetWeapon, _}}}) ->
     Dmg = bqs_entity_handler:calculate_dmg(
             get_weapon_lvl(TargetWeapon), get_armor_lvl(Armor)),
     lager:debug("Received ~p damage. Have totally ~p", [Dmg, HP]),
     case HP-Dmg of
         Dead when Dead =< 0 ->
-            {reply, {ok, [?HEALTH, 0]}, State#player_state{hitpoints = 0}};
+            {reply, {ok, [?HEALTH, 0]}, State#entity{hp = 0}};
         TotalHP ->
-            {reply, {ok, [?HEALTH, TotalHP]}, State#player_state{hitpoints = TotalHP}}
+            {reply, {ok, [?HEALTH, TotalHP]}, State#entity{hp = TotalHP}}
     end;
 
 handle_call({hurt, Attacker}, _From,
-            State = #player_state{armor = Armor, hitpoints = HP}) ->
+            State = #entity{armor = Armor, hp = HP}) ->
     {ok, {Id, TargetWeapon, TargetArmor}} = bqs_mob:get_status(Attacker),
     Dmg = bqs_entity_handler:calculate_dmg(
             get_weapon_lvl(TargetWeapon), get_armor_lvl(Armor)),
     lager:debug("Received ~p damage. Have totally ~p", [Dmg, HP]),
     case HP-Dmg of
         Dead when Dead =< 0 ->
-            {reply, {ok, [?HEALTH, 0]}, State#player_state{hitpoints = 0, local_cache = {Attacker, {Id, TargetWeapon, TargetArmor}}}}; %%FIXME
+            {reply, {ok, [?HEALTH, 0]}, State#entity{hp = 0, local_cache = {Attacker, {Id, TargetWeapon, TargetArmor}}}}; %%FIXME
         TotalHP ->
-            {reply, {ok, [?HEALTH, TotalHP]}, State#player_state{hitpoints = TotalHP, local_cache = {Attacker, {Id, TargetWeapon, TargetArmor}}}}
+            {reply, {ok, [?HEALTH, TotalHP]}, State#entity{hp = TotalHP, local_cache = {Attacker, {Id, TargetWeapon, TargetArmor}}}}
     end;
 
 handle_call(Request, From, State) ->
@@ -228,7 +226,7 @@ handle_cast({stop}, State) ->
 
 handle_cast({event, From, _,
              {action, [Initial,?SPAWN|Tl]}},
-            State = #player_state{id = Id, pos_x = X, pos_y = Y, name = Name,
+            State = #entity{id = Id, pos_x = X, pos_y = Y, name = Name,
                                   armor = Armor, weapon = Weapon, actionlist = ActionList}) ->
     lager:debug("Action received: ~p", [[Initial,?SPAWN|Tl]]),
     case Initial of
@@ -240,32 +238,31 @@ handle_cast({event, From, _,
             ok
     end,
     lager:debug("Found a new entity"),
-    {noreply, State#player_state{actionlist = [[?SPAWN|Tl]|ActionList]}};
+    {noreply, State#entity{actionlist = [[?SPAWN|Tl]|ActionList]}};
 
 handle_cast({event, _From, _,
              {action, [?ATTACK, Attacker]}},
-            State = #player_state{id = Id, actionlist = ActionList}) ->
+            State = #entity{id = Id, actionlist = ActionList}) ->
     Action = [?ATTACK, Attacker, Id],
-    {noreply, State#player_state{actionlist = [Action|ActionList]}};
+    {noreply, State#entity{actionlist = [Action|ActionList]}};
 
 handle_cast({event, _From, _Type, {action, AC}},
-            State = #player_state{actionlist = ActionList}) ->
+            State = #entity{actionlist = ActionList}) ->
     lager:debug("Got event: ~p", [AC]),
-    {noreply, State#player_state{actionlist = [AC|ActionList]}};
+    {noreply, State#entity{actionlist = [AC|ActionList]}};
 
 handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
     {noreply, State}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % action from other entity
-handle_info(#spawn{}=M, #player_state{actionlist = ActionList}=State) ->
-    {noreply, State#player_state{actionlist = [M|ActionList]}};
+handle_info(#spawn{}=M, #entity{actionlist = ActionList}=State) ->
+    {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(Info, State) ->
     bqs_util:unexpected_info(?MODULE, Info, State),
     {noreply, State}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-terminate(_Reason, #player_state{zone = Zone}) ->
-    bqs_entity_handler:unregister(Zone),
+terminate(_Reason, #entity{}) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
