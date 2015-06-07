@@ -8,39 +8,41 @@
 -type orientation() :: up | down | left | right | undefined .
 
 -record(player_state, {
-    id,
-    name,
-    armor,
-    weapon,
-    hitpoints,
-    pos_x,
-    pos_y,
-    checkpoint,
-    zone,
-    actionlist,
-    target,
-    local_cache
-}).
+          id,
+          name,
+          type,
+          armor,
+          weapon,
+          hitpoints,
+          pos_x,
+          pos_y,
+          orientation,
+          checkpoint,
+          zone,
+          actionlist,
+          target,
+          local_cache
+         }).
 
 -record(mob_state, {id,
-    module,
-    type,
-    hitpoints,
-    pos_x,
-    pos_y,
-    armor,
-    weapon,
-    hate,
-    hate_counter,
-    item,
-    respawn_timout,
-    return_timeout,
-    orientation, %TODO initalize in init
-    attackers = [],
-    range,
-    target,
-    zone
-}).
+                    module,
+                    type,
+                    hitpoints,
+                    pos_x,
+                    pos_y,
+                    armor,
+                    weapon,
+                    hate,
+                    hate_counter,
+                    item,
+                    respawn_timout,
+                    return_timeout,
+                    orientation, %TODO initalize in init
+                    attackers = [],
+                    range,
+                    target,
+                    zone
+                   }).
 
 %% entity enter map; enter zone
 -record(spawn, {from :: pid(),
@@ -51,6 +53,11 @@
                 orientation :: orientation(),
                 armor :: integer(),
                 weapon :: integer()}).
+
+-define(SPAWNMSG(S), #spawn{from=self(), id=S#player_state.id,
+                            type=S#player_state.type, x=S#player_state.pos_x, y=S#player_state.pos_y,
+                            orientation = S#player_state.orientation, armor = S#player_state.armor,
+                            weapon = S#player_state.weapon}).
 
 %% entity leave map; leave zone
 -record(despawn, {from :: pid(),
@@ -66,10 +73,10 @@
                y :: pos_y(),
                orientation :: orientation()}).
 
-% Player
+%% Player
 -define(WARRIOR, <<"warrior">>).
 
-% Mobs
+%% Mobs
 -define(RAT, <<"rat">>).
 -define(SKELETON, <<"skeleton">>).
 -define(GOBLIN, <<"goblin">>).
@@ -84,7 +91,7 @@
 -define(BOSS, <<"boss">>).
 -define(DEATHKNIGHT, <<"deathknight">>).
 
-% Armors
+%% Armors
 -define(FIREFOX, <<"firefox">>).
 -define(CLOTHARMOR, <<"clotharmor">>).
 -define(LEATHERARMOR, <<"leatherarmor">>).
@@ -93,14 +100,14 @@
 -define(REDARMOR, <<"redarmor">>).
 -define(GOLDENARMOR, <<"goldenarmor">>).
 
-% Objects
+%% Objects
 -define(FLASK, <<"flask">>).
 -define(BURGER, <<"burger">>).
 -define(CHEST, <<"chest">>).
 -define(FIREPOTION, <<"firepotion">>).
 -define(CAKE, <<"cake">>).
 
-% NPCs
+%% NPCs
 -define(GUARD, <<"guard">>).
 -define(KING, <<"king">>).
 -define(OCTOCAT, <<"octocat">>).
@@ -118,7 +125,7 @@
 -define(LAVANPC, <<"lavanpc">>).
 -define(CODER, <<"coder">>).
 
-% Weapons
+%% Weapons
 -define(SWORD1, <<"sword1">>).
 -define(SWORD2, <<"sword2">>).
 -define(REDSWORD, <<"redsword">>).

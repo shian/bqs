@@ -150,13 +150,14 @@ handle_cast(Msg, State) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 handle_info(#spawn{from = Pid}=Evt, #mob_state{module=M} = State) ->
-    NewState = #mob_state{id = Id, type = Type,
-                          pos_x = X, pos_y = Y,
+    NewState = #mob_state{id = Id, type = Type, pos_x = X, pos_y = Y,
                           orientation = Orientation} = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, #spawn{id=Id, type=Type, x=X, y=Y, orientation = Orientation}),
     {noreply, NewState};
-handle_info(#move{}=Evt, #mob_state{module=M}=State) ->
+handle_info(#move{from = Pid}=Evt, #mob_state{module=M, id=Id, type=Type, pos_x=X, pos_y=Y,
+                                              orientation=Orientation}=State) ->
     NewState = M:on_event(Evt, State),
+    bqs_event:to_entity(Pid, #spawn{id=Id, type=Type, x=X, y=Y, orientation = Orientation}),
     {noreply, NewState};
 handle_info(Evt, #mob_state{module=M}=State) ->
     NewState = M:on_event(Evt, State),

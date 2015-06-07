@@ -122,10 +122,13 @@ handle_call({move, X, Y}, _From,
             bqs_event:to_zone(Zone, M),
             {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
         {ok, X1, Y1, NewZone} ->
+            NewState = State#player_state{pos_x = X1, pos_y = Y1, zone=NewZone},
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
             bqs_event:to_zone(Zone, M),
-            bqs_event:to_zone(NewZone, M),
-            {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
+            gproc:unreg({p, l, {zone, Zone}}),
+            gproc:reg({p, l, {zone, NewZone}}),
+            bqs_event:to_zone(NewZone, ?SPAWNMSG(NewState)),
+            {reply, {ok, M}, NewState};
         {error, _} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = OldX, y = OldY},
             {reply, {ok, M}, State}
@@ -135,18 +138,18 @@ handle_call({set_checkpoint, Value}, _From, State) ->
     {reply, ok, State#player_state{checkpoint = Value}};
 
 handle_call({update_zone}, _From,
-            State = #player_state{zone = OldZone, id = Id, name = Name,
-                                  armor = Armor, weapon = Weapon,
-                                  pos_x = X, pos_y = Y}) ->
-    %% Delete old zone and insert the new one
-    NewZone = bqs_entity_handler:make_zone(X, Y),
-    gproc:unreg({p, l, {zone, OldZone}}),
-    %%Action = {action, [true, ?SPAWN, Id,
-    %%                   ?WARRIOR, X, Y, Name, ?DOWN, Armor, Weapon]},
-    gproc:reg({p, l, {zone, NewZone}}),
-    bqs_event:to_zone(NewZone, #spawn{id=Id, type=worrior, x=X, y=Y}),
-    lager:debug("update zone: ~p", [{OldZone, NewZone}]),
-    {reply, ok, State#player_state{zone = NewZone}};
+            State = #player_state{pos_x = X, pos_y = Y, zone=Zone1}) ->
+    case bqs_entity_handler:make_zone(X, Y) of
+        Zone1 ->
+            {reply, ok, State};
+        Zone2 ->
+            gproc:unreg({p, l, {zone, Zone1}}),
+            gproc:reg({p, l, {zone, Zone2}}),
+            NewState = State#player_state{zone = Zone2},
+            bqs_event:to_zone(Zone2, ?SPAWNMSG(NewState)),
+            lager:debug("update zone: ~p", [{Zone1, Zone2}]),
+            {reply, ok, NewState}
+    end;
 
 handle_call({get_zone}, _From, State = #player_state{zone = Zone}) ->
     {reply, {ok, Zone}, State};
