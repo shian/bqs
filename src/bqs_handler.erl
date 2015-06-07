@@ -136,8 +136,8 @@ parse_action([?HELLO, Name, Armor, Weapon], State) ->
     {json, [?WELCOME, Id, Name, X, Y, HP], State#state{player = Player}};
 
 parse_action([?MOVE, X, Y], State = #state{player = Player}) ->
-    {ok, #move{id=Id, x=X, y=Y}} = bqs_player:move(Player, X, Y),
-    {json, [?MOVE, Id, X, Y], State};
+    {ok, #move{id=Id, x=X1, y=Y1}} = bqs_player:move(Player, X, Y),
+    {json, [?MOVE, Id, X1, Y1], State};
 
 parse_action([?ATTACK, Target], State = #state{player = Player}) ->
     ok = bqs_player:attack(Player, Target),
@@ -179,7 +179,7 @@ parse_action(ActionList, _State) ->
     exit({faulty_actionlist, ActionList}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-trans(#spawn{id=Id, type=Type, x=X, y=Y}) ->
+trans(#spawn{id=Id, type=Type, x=X, y=Y}=M) ->
     [?SPAWN, Id, type_to_integer(Type), X, Y].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -195,7 +195,7 @@ make_tick(Node, TickTime) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 type_to_integer(Type) ->
     case lists:keyfind(Type, 1, game_type()) of
-        I when is_integer(I) ->
+        {Type, I} when is_integer(I) ->
             I;
         _ ->
             0
@@ -203,10 +203,10 @@ type_to_integer(Type) ->
 
 integer_to_type(I) when is_integer(I) ->
     case lists:keyfind(I, 2, game_type()) of
-        false ->
-            undefined;
-        T ->
-            T
+        {T, I} ->
+            T;
+        _ ->
+            undefined
     end.
 
 game_type() ->

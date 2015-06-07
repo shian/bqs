@@ -117,25 +117,14 @@ handle_call({get_status}, _From, State) ->
 handle_call({move, X, Y}, _From,
             State = #player_state{pos_x = OldX, pos_y = OldY, id = Id, zone = Zone}) ->
     case bqs_map:move_to(OldX, OldY, X, Y) of
-        {ok, X, Y, Zone} ->
-            M = #move{id=Id, old_x = OldX, old_y = OldY, x = X, y = Y},
-            bqs_event:to_zone(Zone, M),
-            {reply, {ok, M}, State#player_state{pos_x = X, pos_y = Y}};
         {ok, X1, Y1, Zone} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
             bqs_event:to_zone(Zone, M),
             {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
-        {ok, X, Y, NewZone} ->
-            M = #move{id=Id, old_x = OldX, old_y = OldY, x = X, y = Y},
-            bqs_event:to_zone(Zone, M),
-            bqs_event:to_zone(Zone, #despawn{id=Id}),
-            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X, y=Y, orientation = ?DOWN}),
-            {reply, {ok, M}, State#player_state{pos_x = X, pos_y = Y, zone=NewZone}};
         {ok, X1, Y1, NewZone} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = X1, y = Y1},
             bqs_event:to_zone(Zone, M),
-            bqs_event:to_zone(Zone, #despawn{id=Id}),
-            bqs_event:to_zone(NewZone, #spawn{id=Id, type=warrior, x=X1, y=Y1, orientation = ?DOWN}),
+            bqs_event:to_zone(NewZone, M),
             {reply, {ok, M}, State#player_state{pos_x = X1, pos_y = Y1}};
         {error, _} ->
             M = #move{id=Id, old_x = OldX, old_y = OldY, x = OldX, y = OldY},
