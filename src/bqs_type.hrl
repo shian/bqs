@@ -8,6 +8,7 @@
 -type orientation() :: up | down | left | right | undefined .
 
 -record(entity, {id :: id(),
+                 pid :: pid(),
                  module,
                  name :: binary(),
                  type :: binary(),
@@ -39,19 +40,25 @@
                 y :: pos_y(),
                 orientation :: orientation(),
                 armor :: integer(),
-                weapon :: integer()}).
+                weapon :: integer(),
+                echo = false}).
 
--define(SPAWNMSG(E), #spawn{from=self(), id=E#entity.id,
+-define(SPAWNMSG(E), #spawn{from=E#entity.pid, id=E#entity.id,
                             type=E#entity.type, x=E#entity.pos_x, y=E#entity.pos_y,
                             orientation = E#entity.orientation, armor = E#entity.armor,
                             weapon = E#entity.weapon}).
+
+-define(SPAWNMSG_ECHO(E), #spawn{from=E#entity.pid, id=E#entity.id,
+                                 type=E#entity.type, x=E#entity.pos_x, y=E#entity.pos_y,
+                                 orientation = E#entity.orientation, armor = E#entity.armor,
+                                 weapon = E#entity.weapon, echo=true}).
 
 %% entity leave map; leave zone
 -record(despawn, {from :: pid(),
                   id :: id()
                  }).
 
--define(DESPAWNMSG(E), #despawn{from=self(), id=E#entity.id}).
+-define(DESPAWNMSG(E), #despawn{from=E#entity.pid, id=E#entity.id}).
 
 %% entity move from {old_x, old_y} to {x, y}
 -record(move, {from :: pid(),
@@ -62,8 +69,8 @@
                y :: pos_y(),
                orientation :: orientation()}).
 
--define(MOVEMSG(E), #move{from=self(), id=E#entity.id, x=E#entity.pos_x, y=E#entity.pos_y,
-                       orientation = E#entity.orientation}).
+-define(MOVEMSG(E), #move{from=E#entity.pid, id=E#entity.id, x=E#entity.pos_x, y=E#entity.pos_y,
+                          orientation = E#entity.orientation}).
 
 %% Player
 -define(WARRIOR, <<"warrior">>).

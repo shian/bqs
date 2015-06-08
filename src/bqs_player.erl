@@ -85,12 +85,12 @@ init([Name, Armor, Weapon]) ->
     Hitpoints = ?CALC_HP(get_armor_lvl(Armor)),
 
     #cp{x = PosX, y = PosY} = bqs_map:get_startingAreas(),
-    Zone = bqs_map:make_zone(PosX, PosY),
 
     gproc:reg({n, l, Id}),
-    gproc:mreg(p, l, [{name, Name}, {{type, ?WARRIOR}, 1}, {{zone, Zone}, 1}]),
+    gproc:mreg(p, l, [{name, Name}, {{type, ?WARRIOR}, 1}]),
 
     State = #entity{id = Id,
+                    pid = self(),
                     name = Name,
                     armor = Armor,
                     weapon = Weapon,
@@ -98,14 +98,18 @@ init([Name, Armor, Weapon]) ->
                     pos_y = PosY,
                     hp = Hitpoints,
                     checkpoint = 0,
-                    zone = Zone,
                     actionlist = [],
                     local_cache = []
                    },
 
-    bqs_event:to_zone(Zone, ?SPAWNMSG(State)),
-    lager:debug("Player zone: ~p", [Zone]),
-    {ok, State}.
+    case bqs_map:enter_map(State, PosX, PosY) of
+        {ok, State2} ->
+            lager:debug("New player ~p", [State2]),
+            {ok, State2};
+        Error ->
+            lager:error("Create player fail: ~p; ~p", [Error, State]),
+            {stop, Error}
+    end.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% from websocket
 handle_call({get_status}, _From, State) ->
@@ -114,23 +118,11 @@ handle_call({get_status}, _From, State) ->
 %%% 在地圖上移動
 handle_call({move, X, Y}, _From,
             State = #entity{pos_x = OldX, pos_y = OldY, zone = Zone}) ->
-    case bqs_map:move_to(OldX, OldY, X, Y) of
-        {ok, X1, Y1, Zone} ->
-            NewState = State#entity{pos_x = X1, pos_y = Y1},
-            M = ?MOVEMSG(NewState),
-            bqs_event:to_zone(Zone, M),
-            {reply, {ok, M}, NewState};
-        {ok, X1, Y1, NewZone} ->
-            NewState = State#entity{pos_x = X1, pos_y = Y1, zone=NewZone},
-            M = ?MOVEMSG(NewState),
-            bqs_event:to_zone(Zone, M),
-            gproc:unreg({p, l, {zone, Zone}}),
-            gproc:reg({p, l, {zone, NewZone}}),
-            bqs_event:to_zone(NewZone, ?SPAWNMSG(NewState)),
-            {reply, {ok, M}, NewState};
+    case bqs_map:move_to(State, X, Y) of
+        {ok, NewState} ->
+            {reply, {ok, ?MOVEMSG(NewState)}, NewState};
         {error, _} ->
-            M = ?MOVEMSG(State),
-            {reply, {ok, M}, State}
+            {reply, {ok, ?MOVEMSG(State)}, State}
     end;
 
 handle_call({set_checkpoint, Value}, _From, State) ->
@@ -256,7 +248,10 @@ handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
     {noreply, State}.
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-                                                % action from other entity
+%% action from other entity
+handle_info(#spawn{from=Pid, echo=true}=M, #entity{actionlist = ActionList}=State) ->
+    bqs_event:to_entity(Pid, ?SPAWNMSG(State)),
+    {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(#spawn{}=M, #entity{actionlist = ActionList}=State) ->
     {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(Info, State) ->

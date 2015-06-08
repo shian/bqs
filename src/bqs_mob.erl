@@ -51,16 +51,19 @@ init([BinType, X, Y]) ->
             {stop, {undefined, BinType}};
         M ->
             Id = bqs_entity_handler:generate_id("1"),
-            Zone = bqs_map:make_zone(X, Y),
-            Orientation = bqs_util:random_pick([?DOWN, ?UP, ?LEFT, ?RIGHT]),
-
-            State = M:on_init(#entity{id = Id, type = BinType, module = M,
-                                      pos_x = X, pos_y = Y, zone=Zone, orientation = Orientation}),
-
             gproc:reg({n, l, Id}),
-            gproc:mreg(p, l, [{{type, BinType}, 1}, {{zone, Zone}, 1}]),
-            lager:debug("registering ~p {~p, ~p}", [BinType, X, Y]),
-            {ok, State}
+            gproc:mreg(p, l, [{{type, BinType}, 1}]),
+            State = M:on_init(#entity{id=Id, pid=self(), type=BinType, module=M,
+                                      pos_x=X, pos_y=Y}),
+
+            case bqs_map:enter_map(State, X, Y) of
+                {ok, State2} ->
+                    lager:debug("Mob[~p]~p", [BinType, State2]),
+                    {ok, State2};
+                Error ->
+                    lager:error("create mob fail: ~p; ~p", [Error, State]),
+                    {stop, Error}
+            end
     end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -149,12 +152,9 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %%%% Entity Msg %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_info(#spawn{from = Pid}=Evt, #entity{module=M} = State) ->
+handle_info(#spawn{from = Pid, echo=true}=Evt, #entity{module=M} = State) ->
     NewState = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, ?SPAWNMSG(NewState)),
-    {noreply, NewState};
-handle_info(#move{}=Evt, #entity{module=M}=State) ->
-    NewState = M:on_event(Evt, State),
     {noreply, NewState};
 handle_info(Evt, #entity{module=M}=State) ->
     NewState = M:on_event(Evt, State),

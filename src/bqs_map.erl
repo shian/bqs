@@ -19,7 +19,7 @@
     is_out_of_bounds/2,
     tileid_to_pos/1,
     pos_to_tileid/2
-    , move_to/4, make_zone/2]).
+    , move_to/3, make_zone/2, enter_map/3]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -53,19 +53,53 @@ is_out_of_bounds(X, Y) ->
     Height = ?PROPERTY(height),
     (X < 1) or (X >= Width) or (Y < 1) or (Y >= Height).
 
--spec move_to(pos_x(), pos_y(), pos_x(), pos_y()) -> {ok, pos_x(), pos_y(), zone()} | {error, any()}.
-move_to(_OldX, _OldY, X, Y) ->
-    case is_out_of_bounds(X, Y) of
+%% 移動到地圖上的點
+-spec move_to(#entity{}, pos_x(), pos_y()) -> {ok, #entity{}} | {error, any()}.
+move_to(E, X, Y) ->
+    case check_pos(X, Y) of
+        ok ->
+            case {E#entity.zone, make_zone(X, Y)} of
+                {Z, Z} -> % 在同一個 zone 底下
+                    E1 = E#entity{pos_x = X, pos_y = Y},
+                    M = ?MOVEMSG(E1),
+                    bqs_event:to_zone(Z, M),
+                    {ok, E1};
+                {Z1, Z2} -> % 切換到不同的 zone
+                    E1 = E#entity{pos_x = X, pos_y = Y, zone=Z2},
+                    M = ?MOVEMSG(E1),
+                    bqs_event:to_zone(Z1, M), % 讓舊的 zone 裡面的 entity 知道移動了
+                    gproc:unreg({p, l, {zone, Z1}}),
+                    gproc:reg({p, l, {zone, Z2}}),
+                    bqs_event:to_zone(Z2, ?SPAWNMSG_ECHO(E1)),
+                    {ok, E1}
+            end;
+        {error, Why} ->
+            {error, Why}
+    end.
+
+%% 進入地圖
+-spec enter_map(#entity{}, pos_x(), pos_y()) -> {ok, #entity{}} | {error, any()}.
+enter_map(E0, PosX, PosY) ->
+    Zone = bqs_map:make_zone(PosX, PosY),
+    gproc:reg({p, l, {zone, Zone}}),
+    E1 = E0#entity{pos_x=PosX, pos_y=PosY, orientation = ?DOWN},
+
+    bqs_event:to_zone(Zone, ?SPAWNMSG_ECHO(E1)),
+    {ok, E1}.
+
+%% 檢查地圖上的點是否可以站立
+check_pos(PosX, PosY) ->
+    case is_out_of_bounds(PosX, PosY) of
         true ->
-            lager:debug("out of bound: ~p, ~p", [X, Y]),
+            lager:debug("out of bound: ~p, ~p", [PosX, PosY]),
             {error, out_of_bound};
         _ ->
-            case is_colliding(X, Y) of
+            case is_colliding(PosX, PosY) of
                 true ->
-                    lager:debug("colliding: ~p, ~p", [X, Y]),
+                    lager:debug("colliding: ~p, ~p", [PosX, PosY]),
                     {error, colliding};
                 _ ->
-                    {ok, X, Y, make_zone(X, Y)}
+                    ok
             end
     end.
 
