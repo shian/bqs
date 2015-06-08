@@ -179,8 +179,10 @@ parse_action(ActionList, _State) ->
     exit({faulty_actionlist, ActionList}).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-trans(#spawn{id=Id, type=Type, x=X, y=Y}=M) ->
-    [?SPAWN, Id, type_to_integer(Type), X, Y].
+trans(#spawn{id=Id, type=Type, x=X, y=Y}) ->
+    [?SPAWN, Id, type_to_integer(Type), X, Y];
+trans(#move{id=Id, x=X, y=Y}) ->
+    [?MOVE, Id, X, Y].
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 make_tick(Node, TickTime) ->

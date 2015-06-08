@@ -254,6 +254,8 @@ handle_info(#spawn{from=Pid, echo=true}=M, #entity{actionlist = ActionList}=Stat
     {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(#spawn{}=M, #entity{actionlist = ActionList}=State) ->
     {noreply, State#entity{actionlist = [M|ActionList]}};
+handle_info(#move{}=M, #entity{actionlist = ActionList}=State) ->
+    {noreply, State#entity{actionlist = [M|ActionList]}};
 handle_info(Info, State) ->
     bqs_util:unexpected_info(?MODULE, Info, State),
     {noreply, State}.
