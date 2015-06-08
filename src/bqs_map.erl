@@ -82,7 +82,7 @@ move_to(E, X, Y) ->
 enter_map(E0, PosX, PosY) ->
     Zone = bqs_map:make_zone(PosX, PosY),
     gproc:reg({p, l, {zone, Zone}}),
-    E1 = E0#entity{pos_x=PosX, pos_y=PosY, orientation = ?DOWN},
+    E1 = E0#entity{pos_x=PosX, pos_y=PosY, orientation = ?DOWN, zone=Zone},
 
     bqs_event:to_zone(Zone, ?SPAWNMSG_ECHO(E1)),
     {ok, E1}.
@@ -91,12 +91,10 @@ enter_map(E0, PosX, PosY) ->
 check_pos(PosX, PosY) ->
     case is_out_of_bounds(PosX, PosY) of
         true ->
-            lager:debug("out of bound: ~p, ~p", [PosX, PosY]),
             {error, out_of_bound};
         _ ->
             case is_colliding(PosX, PosY) of
                 true ->
-                    lager:debug("colliding: ~p, ~p", [PosX, PosY]),
                     {error, colliding};
                 _ ->
                     ok

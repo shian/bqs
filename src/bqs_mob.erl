@@ -154,7 +154,6 @@ handle_info(#spawn{from = Pid, echo=true}=Evt, #entity{module=M} = State) ->
     bqs_event:to_entity(Pid, ?SPAWNMSG(NewState)),
     {noreply, NewState, ?TICK_TIME};
 handle_info(Evt, #entity{module=M}=State) ->
-    io:fwrite("event: ~p~n", [Evt]),
     NewState = M:on_event(Evt, State),
     {noreply, NewState, ?TICK_TIME}.
 

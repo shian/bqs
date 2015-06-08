@@ -29,4 +29,16 @@ on_event(_Evt, State) ->
     State.
 
 on_tick(State) ->
-    State.
+    %% move around
+    case bqs_util:random_pick([{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {0, 0}, {0, 0}, {0, 0}, {0, 0},
+                               {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}]) of
+        {0, 0} ->
+            State;
+        {DeltaX, DeltaY} ->
+            case bqs_map:move_to(State, State#entity.pos_x + DeltaX, State#entity.pos_y + DeltaY) of
+                {ok, NewState} ->
+                    NewState;
+                {error, _} ->
+                    State
+            end
+    end.
