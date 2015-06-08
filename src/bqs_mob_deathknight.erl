@@ -12,7 +12,7 @@
 -include("bqs_type.hrl").
 
 %% API
--export([on_init/1, on_event/2]).
+-export([on_init/1, on_event/2, on_tick/1]).
 
 on_init(State) ->
     Drops = [{95, ?BURGER},
@@ -25,4 +25,7 @@ on_init(State) ->
                  weapon = ?REDSWORD}.
 
 on_event(_Evt, State) ->
+    State.
+
+on_tick(State) ->
     State.

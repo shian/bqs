@@ -20,7 +20,7 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
-
+-define(TICK_TIME, 1000).
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -59,7 +59,7 @@ init([BinType, X, Y]) ->
             case bqs_map:enter_map(State, X, Y) of
                 {ok, State2} ->
                     lager:debug("Mob[~p]~p", [BinType, State2]),
-                    {ok, State2};
+                    {ok, State2, ?TICK_TIME};
                 Error ->
                     lager:error("create mob fail: ~p; ~p", [Error, State]),
                     {stop, Error}
@@ -68,21 +68,15 @@ init([BinType, X, Y]) ->
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 handle_call({get_status}, _From, State) ->
-    {reply, {ok, State#entity{attackers=[]}}, State};
+    {reply, {ok, State#entity{attackers=[]}}, State, ?TICK_TIME};
 
 handle_call(Request, From, State) ->
     bqs_util:unexpected_call(?MODULE, Request, From, State),
-    {reply, ok, State}.
+    {reply, ok, State, ?TICK_TIME}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-handle_cast({tick}, State = #entity{hate = _Hate, hp = HP}) ->
-    case HP of
-        Dead when Dead =< 0 ->
-            die;
-        _ ->
-            ok
-    end,
-    {noreply, State};
+handle_cast({tick}, State = #entity{}) ->
+    {noreply, State, ?TICK_TIME};
 
 handle_cast({event, From, ?WARRIOR,
              {action, [?MOVE, _Id, ?WARRIOR, X, Y, _Name, _Orient, _Armor, _Weapon]}},
@@ -90,13 +84,13 @@ handle_cast({event, From, ?WARRIOR,
   when Hate =:= [] andalso ((PX - Range < X andalso X < (PX + Range))
                             orelse ((PY - Range) < Y andalso Y < (PY + Range))) ->
     %% Hates on for you
-    {noreply, State#entity{hate = [From]}};
+    {noreply, State#entity{hate = [From]}, ?TICK_TIME};
 
 handle_cast({event, _From, ?WARRIOR, {action, [?MOVE, _Id, ?WARRIOR, _X, _Y, _Name,
                                                _Orient, _Armor, _Weapon]}}, State) ->
     %% Hates on for you
     lager:debug("I'm gonna get ya!"),
-    {noreply, State};
+    {noreply, State, ?TICK_TIME};
 
 handle_cast({event, _From, ?WARRIOR, {action, [?ATTACK, Id]}}, State) ->
     %% Hates on for you
@@ -104,14 +98,14 @@ handle_cast({event, _From, ?WARRIOR, {action, [?ATTACK, Id]}}, State) ->
     bqs_entity_handler:event(State#entity.zone,
                              State#entity.type,
                              {action, [?ATTACK, State#entity.id]}),
-    {noreply, State};
+    {noreply, State, ?TICK_TIME};
 
 %% A hero have spawned in our zone
 handle_cast({event, From, ?WARRIOR,
              {action, [_, ?SPAWN, _Id, ?WARRIOR, _X, _Y, _Name, _Orient, _Armor, _Weapon]}},
             State = #entity{id = Id, type = Type, pos_x = X, pos_y = Y}) ->
     gen_server:cast(From, {event, self(), Id, {action, [false, ?SPAWN, Id, Type, X, Y]}}),
-    {noreply, State};
+    {noreply, State, ?TICK_TIME};
 
 handle_cast({event, From, ?WARRIOR,
              {action, [?ATTACK, Target]}},
@@ -121,14 +115,14 @@ handle_cast({event, From, ?WARRIOR,
             %% I'm gonna KILL you
             bqs_entity_handler:event(
               Zone, Type, {action, [?ATTACK, Id]}),
-            {noreply, State#entity{hate = [From]}};
+            {noreply, State#entity{hate = [From]}, ?TICK_TIME};
         _ ->
-            {noreply, State}
+            {noreply, State, ?TICK_TIME}
     end;
 
 %% event from other mob
 handle_cast({event, _From, _, _}, State) ->
-    {noreply, State};
+    {noreply, State, ?TICK_TIME};
 
 handle_cast({receive_damage, Amount},
             State = #entity{id = Id, zone = Zone, type = Type, hp = HP,
@@ -144,21 +138,25 @@ handle_cast({receive_damage, Amount},
             drop_item(Item, X, Y),
             {stop, normal, NewState};
         false ->
-            {noreply, NewState}
+            {noreply, NewState, ?TICK_TIME}
     end;
 
 handle_cast(Msg, State) ->
     bqs_util:unexpected_cast(?MODULE, Msg, State),
-    {noreply, State}.
+    {noreply, State, ?TICK_TIME}.
 
 %%%% Entity Msg %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+handle_info(timeout, #entity{module=M} = State) ->
+    NewState = M:on_tick(State),
+    {noreply, NewState, ?TICK_TIME};
 handle_info(#spawn{from = Pid, echo=true}=Evt, #entity{module=M} = State) ->
     NewState = M:on_event(Evt, State),
     bqs_event:to_entity(Pid, ?SPAWNMSG(NewState)),
-    {noreply, NewState};
+    {noreply, NewState, ?TICK_TIME};
 handle_info(Evt, #entity{module=M}=State) ->
+    io:fwrite("event: ~p~n", [Evt]),
     NewState = M:on_event(Evt, State),
-    {noreply, NewState}.
+    {noreply, NewState, ?TICK_TIME}.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 terminate(_Reason, _State) ->
